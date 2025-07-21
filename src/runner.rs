@@ -46,7 +46,7 @@ impl ServerRunner {
             self.get_command_for_platform(&server_path, &normalized_args)?;
 
         if self.verbose {
-            eprintln!("Executing command: {} {:?}", command, command_args);
+            eprintln!("Executing command: {command} {command_args:?}");
         }
 
         // Execute the command
@@ -58,7 +58,7 @@ impl ServerRunner {
 
         let status = cmd
             .status()
-            .with_context(|| format!("Failed to execute command: {}", command))?;
+            .with_context(|| format!("Failed to execute command: {command}"))?;
 
         if !status.success() {
             let exit_code = status.code().unwrap_or(-1);

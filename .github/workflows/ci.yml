@@ -24,7 +24,7 @@ jobs:
         include:
           # Test on minimum supported Rust version
           - os: ubuntu-latest
-            rust: "1.70.0"
+            rust: "1.75.0"
 
     steps:
     - name: Checkout code
