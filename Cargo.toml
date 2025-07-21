@@ -1,9 +1,21 @@
 [package]
 name = "mcp-helper"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+
+[lib]
+name = "mcp_helper"
+path = "src/lib.rs"
+
+[[bin]]
+name = "mcp-helper"
+path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
 anyhow = "1.0"
 colored = "2.1"
+which = "7.0"
+
+[dev-dependencies]
+rusty-hook = "^0.11"

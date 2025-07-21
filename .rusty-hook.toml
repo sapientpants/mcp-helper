@@ -1,0 +1,13 @@
+# MCP Helper Git Hooks Configuration
+# Ensures code quality before commits and pushes
+
+[hooks]
+# Pre-commit hooks run before each commit
+pre-commit = "make pre-commit"
+
+# Pre-push hooks run before pushing to remote
+pre-push = "make pre-push"
+
+[logging]
+# Enable verbose output to see what hooks are running
+verbose = false

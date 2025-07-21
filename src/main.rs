@@ -1,73 +1,72 @@
-use clap::{Parser, Subcommand};
 use anyhow::Result;
+use clap::{Parser, Subcommand};
 use colored::*;
+use std::env;
+
+mod runner;
+
+// Import Platform from runner module
+use runner::Platform;
 
 #[derive(Parser)]
-#[command(name = "mcp-helper")]
-#[command(author = "Your Name <you@example.com>")]
-#[command(version = "1.0")]
-#[command(about = "MCP Helper - A CLI tool for MCP operations", long_about = None)]
+#[command(name = "mcp")]
+#[command(author = "MCP Helper Contributors")]
+#[command(version = "0.1.0")]
+#[command(about = "MCP Helper - Make MCP Just Work™", long_about = None)]
 struct Cli {
     #[command(subcommand)]
-    command: Option<Commands>,
+    command: Commands,
 
-    #[arg(short, long, help = "Enable verbose output")]
+    #[arg(short, long, help = "Enable verbose output", global = true)]
     verbose: bool,
 }
 
 #[derive(Subcommand)]
 enum Commands {
-    #[command(about = "Say hello to someone")]
-    Hello {
-        #[arg(short, long, default_value = "World")]
-        name: String,
-        
-        #[arg(short, long, help = "Number of times to greet")]
-        count: Option<u32>,
+    #[command(about = "Run an MCP server")]
+    Run {
+        #[arg(help = "Name of the MCP server to run")]
+        server: String,
+
+        #[arg(
+            trailing_var_arg = true,
+            help = "Additional arguments to pass to the server"
+        )]
+        args: Vec<String>,
     },
-    
-    #[command(about = "Perform calculations")]
-    Calculate {
+
+    #[command(about = "Install an MCP server")]
+    Install {
+        #[arg(help = "Name or path of the MCP server to install")]
+        server: String,
+    },
+
+    #[command(about = "One-time setup for your OS")]
+    Setup,
+
+    #[command(about = "Manage MCP server configurations")]
+    Config {
         #[command(subcommand)]
-        operation: Operation,
+        action: ConfigAction,
     },
-    
-    #[command(about = "Display information")]
-    Info {
-        #[arg(short, long, help = "Show detailed information")]
-        detailed: bool,
-    },
+
+    #[command(about = "Diagnose and fix common MCP issues")]
+    Doctor,
 }
 
 #[derive(Subcommand)]
-enum Operation {
-    #[command(about = "Add two numbers")]
+enum ConfigAction {
+    #[command(about = "Add a server to configuration")]
     Add {
-        #[arg(help = "First number")]
-        a: f64,
-        #[arg(help = "Second number")]
-        b: f64,
+        #[arg(help = "Name of the server")]
+        server: String,
     },
-    #[command(about = "Subtract two numbers")]
-    Subtract {
-        #[arg(help = "First number")]
-        a: f64,
-        #[arg(help = "Second number")]
-        b: f64,
-    },
-    #[command(about = "Multiply two numbers")]
-    Multiply {
-        #[arg(help = "First number")]
-        a: f64,
-        #[arg(help = "Second number")]
-        b: f64,
-    },
-    #[command(about = "Divide two numbers")]
-    Divide {
-        #[arg(help = "Dividend")]
-        a: f64,
-        #[arg(help = "Divisor")]
-        b: f64,
+    #[command(about = "List all configured servers")]
+    List,
+    #[command(about = "Remove a server from configuration")]
+    Remove {
+        #[arg(help = "Name of the server")]
+        server: String,
     },
 }
 
@@ -75,66 +74,82 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     if cli.verbose {
-        println!("{}", "Verbose mode enabled".dimmed());
+        eprintln!("{}", "Verbose mode enabled".dimmed());
     }
 
-    match &cli.command {
-        Some(Commands::Hello { name, count }) => {
-            let times = count.unwrap_or(1);
-            for _ in 0..times {
-                println!("{} {}", "Hello,".green().bold(), name.cyan());
-            }
+    match cli.command {
+        Commands::Run { server, args } => {
+            run_server(&server, &args, cli.verbose)?;
         }
-        Some(Commands::Calculate { operation }) => {
-            let result = match operation {
-                Operation::Add { a, b } => {
-                    println!("{} + {} = {}", a, b, (a + b).to_string().yellow().bold());
-                    a + b
-                }
-                Operation::Subtract { a, b } => {
-                    println!("{} - {} = {}", a, b, (a - b).to_string().yellow().bold());
-                    a - b
-                }
-                Operation::Multiply { a, b } => {
-                    println!("{} × {} = {}", a, b, (a * b).to_string().yellow().bold());
-                    a * b
-                }
-                Operation::Divide { a, b } => {
-                    if *b == 0.0 {
-                        eprintln!("{}", "Error: Division by zero!".red().bold());
-                        return Ok(());
-                    }
-                    println!("{} ÷ {} = {}", a, b, (a / b).to_string().yellow().bold());
-                    a / b
-                }
-            };
-            
-            if cli.verbose {
-                println!("{} {}", "Result:".dimmed(), result.to_string().white());
-            }
+        Commands::Install { server } => {
+            println!("{} Installing MCP server: {}", "→".green(), server.cyan());
+            println!("{}", "Install command not yet implemented".yellow());
         }
-        Some(Commands::Info { detailed }) => {
-            println!("{}", "=== CLI App Information ===".blue().bold());
-            println!("Name: {}", "mcp-helper".green());
-            println!("Version: {}", "1.0.0".yellow());
-            
-            if *detailed {
-                println!("\n{}", "Features:".underline());
-                println!("• {} - Greet someone with customizable repetition", "hello".cyan());
-                println!("• {} - Perform basic arithmetic operations", "calculate".cyan());
-                println!("• {} - Display application information", "info".cyan());
-                println!("\n{}", "Built with:".underline());
-                println!("• {} - Command-line argument parsing", "clap".magenta());
-                println!("• {} - Error handling", "anyhow".magenta());
-                println!("• {} - Colored terminal output", "colored".magenta());
-            }
+        Commands::Setup => {
+            println!("{}", "🔧 Running MCP Helper setup...".blue().bold());
+            println!("{}", "Setup command not yet implemented".yellow());
         }
-        None => {
-            println!("{}", "No command specified. Use --help for usage information.".yellow());
+        Commands::Config { action } => match action {
+            ConfigAction::Add { server } => {
+                println!("{} Adding server to config: {}", "→".green(), server.cyan());
+                println!("{}", "Config add command not yet implemented".yellow());
+            }
+            ConfigAction::List => {
+                println!("{}", "📋 Configured MCP servers:".blue().bold());
+                println!("{}", "Config list command not yet implemented".yellow());
+            }
+            ConfigAction::Remove { server } => {
+                println!(
+                    "{} Removing server from config: {}",
+                    "→".green(),
+                    server.cyan()
+                );
+                println!("{}", "Config remove command not yet implemented".yellow());
+            }
+        },
+        Commands::Doctor => {
+            println!("{}", "🏥 Running MCP diagnostics...".blue().bold());
+            println!("{}", "Doctor command not yet implemented".yellow());
         }
     }
 
     Ok(())
+}
+
+fn run_server(server: &str, args: &[String], verbose: bool) -> Result<()> {
+    println!(
+        "{} Running MCP server: {}",
+        "🚀".green(),
+        server.cyan().bold()
+    );
+
+    // Detect platform
+    let platform = detect_platform();
+    if verbose {
+        eprintln!("{} Detected platform: {:?}", "ℹ".blue(), platform);
+    }
+
+    // Create and use the server runner
+    let runner = runner::ServerRunner::new(platform, verbose);
+    runner.run(server, args)?;
+
+    Ok(())
+}
+
+fn detect_platform() -> Platform {
+    match env::consts::OS {
+        "windows" => Platform::Windows,
+        "macos" => Platform::MacOS,
+        "linux" => Platform::Linux,
+        _ => {
+            eprintln!(
+                "{} Unknown platform: {}, defaulting to Linux behavior",
+                "⚠".yellow(),
+                env::consts::OS
+            );
+            Platform::Linux
+        }
+    }
 }
 
 #[cfg(test)]
@@ -142,8 +157,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_addition() {
-        // Basic test example
-        assert_eq!(2.0 + 2.0, 4.0);
+    fn test_platform_detection() {
+        let platform = detect_platform();
+        // Just ensure it returns something valid
+        match platform {
+            Platform::Windows | Platform::MacOS | Platform::Linux => assert!(true),
+        }
     }
 }

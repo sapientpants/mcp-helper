@@ -3,7 +3,7 @@
 <div align="center">
 
 [![Crates.io](https://img.shields.io/crates/v/mcp-helper.svg)](https://crates.io/crates/mcp-helper)
-[![CI](https://github.com/mcp-helper/mcp-helper/workflows/CI/badge.svg)](https://github.com/mcp-helper/mcp-helper/actions)
+[![CI](https://github.com/mcp-helper/mcp-helper/actions/workflows/ci.yml/badge.svg)](https://github.com/mcp-helper/mcp-helper/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform Support](https://img.shields.io/badge/platform-windows%20%7C%20macos%20%7C%20linux-lightgrey)](https://github.com/mcp-helper/mcp-helper/releases)
 
@@ -247,6 +247,72 @@ chmod +x ~/.local/bin/mcp
 ### Config File Not Found
 
 MCP Helper will create the config file if it doesn't exist. Run `mcp config list` to initialize.
+
+## Current Implementation Status
+
+🚀 **Phase 1 Complete: Core Runner**
+
+The `mcp run` command is now fully functional with:
+- ✅ Cross-platform npx wrapper (Windows/macOS/Linux)
+- ✅ Automatic path separator normalization
+- ✅ Intelligent error messages with actionable fixes
+- ✅ Comprehensive test coverage
+
+### Using the Run Command
+
+```bash
+# Run any npm-based MCP server
+mcp run @modelcontextprotocol/server-filesystem
+
+# Pass arguments to the server
+mcp run my-server --port 3000 --config ./config.json
+
+# Enable verbose output for debugging
+mcp run my-server --verbose
+```
+
+The run command automatically:
+- Detects your operating system
+- Uses the correct npx command (npx.cmd on Windows)
+- Normalizes path separators in arguments
+- Provides helpful error messages if something goes wrong
+
+### Coming Soon
+
+- `mcp install` - Smart package installation
+- `mcp setup` - One-time system configuration
+- `mcp config` - Server configuration management
+- `mcp doctor` - System diagnostics and auto-fixes
+
+## Development Setup
+
+### Git Hooks
+
+This project uses [rusty-hook](https://github.com/swellaby/rusty-hook) to ensure code quality. Git hooks are automatically installed when you run tests or build the project.
+
+#### Pre-commit Hooks
+Before each commit, the following checks run automatically:
+- `make fmt-check` - Ensures code is properly formatted
+- `make lint` - Runs clippy to catch common mistakes
+- `make quick-test` - Runs fast unit tests
+
+#### Pre-push Hooks
+Before pushing to remote, comprehensive checks run:
+- `make pre-push` - Runs formatting, linting, all tests, and security audit
+
+#### Manual Hook Management
+```bash
+# Install/update git hooks
+make hooks
+
+# Run pre-commit checks manually
+make pre-commit
+
+# Run pre-push checks manually
+make pre-push
+```
+
+If a hook fails, you can debug by running the specific make target that failed.
 
 ## Contributing
 
