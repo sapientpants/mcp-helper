@@ -284,6 +284,18 @@ The run command automatically:
 - `mcp config` - Server configuration management
 - `mcp doctor` - System diagnostics and auto-fixes
 
+## Performance
+
+The project uses several optimizations for fast builds:
+
+- **Optimized CI caching** - Builds complete in ~1-2 minutes
+- **Enhanced Cargo caching** - Dependencies cached across all crates
+- **cargo-binstall** - CI tools install in seconds instead of minutes
+- **Parallel job execution** - Tests run concurrently on all platforms
+- **Minimal dependencies** - Fast compilation with only essential crates
+
+Run `scripts/benchmark-build.sh` to measure build performance locally.
+
 ## Development Setup
 
 ### Git Hooks
@@ -294,11 +306,8 @@ This project uses [rusty-hook](https://github.com/swellaby/rusty-hook) to ensure
 Before each commit, the following checks run automatically:
 - `make fmt-check` - Ensures code is properly formatted
 - `make lint` - Runs clippy to catch common mistakes
-- `make quick-test` - Runs fast unit tests
 
-#### Pre-push Hooks
-Before pushing to remote, comprehensive checks run:
-- `make pre-push` - Runs formatting, linting, all tests, and security audit
+These quick checks ensure code quality without slowing down your workflow.
 
 #### Manual Hook Management
 ```bash
@@ -307,9 +316,6 @@ make hooks
 
 # Run pre-commit checks manually
 make pre-commit
-
-# Run pre-push checks manually
-make pre-push
 ```
 
 If a hook fails, you can debug by running the specific make target that failed.

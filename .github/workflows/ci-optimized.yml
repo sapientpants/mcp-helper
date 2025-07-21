@@ -1,4 +1,4 @@
-name: CI
+name: CI (Optimized)
 
 on:
   push:
@@ -12,12 +12,47 @@ env:
   RUST_BACKTRACE: 1
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
-  RUSTFLAGS: "-D warnings"
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
+  RUSTFLAGS: "-D warnings -C link-arg=-fuse-ld=lld"
+  SCCACHE_GHA_ENABLED: "true"
 
 jobs:
+  # Quick checks that can fail fast
+  quick-checks:
+    name: Quick Checks
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+
+    - name: Check formatting
+      run: cargo fmt -- --check
+
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+        key: cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          cargo-registry-
+
+    - name: Check Cargo.lock
+      run: cargo update --locked --package mcp-helper
+
   # Main test job - runs on multiple platforms
   test:
     name: Test - ${{ matrix.os }} / ${{ matrix.rust }}
+    needs: quick-checks
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -27,7 +62,7 @@ jobs:
         include:
           # Test on minimum supported Rust version
           - os: ubuntu-latest
-            rust: "1.75.0"
+            rust: "1.78.0"  # Updated MSRV to support lock file v4
 
     steps:
     - name: Checkout code
@@ -39,40 +74,57 @@ jobs:
         toolchain: ${{ matrix.rust }}
         components: rustfmt, clippy
 
+    # Use sccache for compilation caching
+    - name: Run sccache-cache
+      uses: mozilla-actions/sccache-action@v0.0.4
+
+    # Better Rust caching
     - name: Cache dependencies
       uses: Swatinem/rust-cache@v2
       with:
         key: ${{ matrix.os }}-${{ matrix.rust }}
         cache-all-crates: true
         cache-on-failure: true
-
-    - name: Check formatting
-      run: make fmt-check
-      if: matrix.rust == 'stable'
-
-    - name: Run linter
-      run: make lint
-      if: matrix.rust == 'stable'
+        cache-directories: |
+          ~/.cargo/bin/
+          target/
 
     - name: Build
-      run: make build
+      run: cargo build --all-targets
+      env:
+        RUSTC_WRAPPER: "sccache"
 
     - name: Run tests
-      run: make test
+      run: cargo test --all
+      env:
+        RUSTC_WRAPPER: "sccache"
 
-  # Comprehensive CI job - runs all checks including coverage
+    - name: Run linter
+      if: matrix.rust == 'stable'
+      run: cargo clippy -- -D warnings
+
+  # Comprehensive CI job with coverage
   ci-full:
     name: Full CI Suite
+    needs: quick-checks
     runs-on: ubuntu-latest
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y lld
+
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
       with:
         components: rustfmt, clippy
+
+    - name: Run sccache-cache
+      uses: mozilla-actions/sccache-action@v0.0.4
 
     - name: Cache dependencies
       uses: Swatinem/rust-cache@v2
@@ -81,7 +133,6 @@ jobs:
         cache-on-failure: true
 
     # Use cargo-binstall for faster tool installation
-    # This reduces installation time from ~4-5 minutes to ~20-30 seconds
     - name: Install cargo-binstall
       uses: cargo-bins/cargo-binstall@main
 
@@ -89,8 +140,31 @@ jobs:
       run: |
         cargo binstall --no-confirm --force cargo-audit cargo-tarpaulin
 
-    - name: Run full CI suite
-      run: make ci
+    - name: Check formatting
+      run: make fmt-check
+
+    - name: Run linter
+      run: make lint
+      env:
+        RUSTC_WRAPPER: "sccache"
+
+    - name: Build
+      run: make build
+      env:
+        RUSTC_WRAPPER: "sccache"
+
+    - name: Run tests
+      run: make test
+      env:
+        RUSTC_WRAPPER: "sccache"
+
+    - name: Run security audit
+      run: make audit
+
+    - name: Generate coverage
+      run: make coverage-ci
+      env:
+        RUSTC_WRAPPER: ""  # Disable sccache for tarpaulin
 
     - name: Upload coverage report
       uses: actions/upload-artifact@v4
@@ -106,24 +180,29 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
         fail_ci_if_error: false
 
-  # Build release binaries for distribution
+  # Build release binaries in parallel
   release-build:
     name: Release Build - ${{ matrix.target }}
+    needs: quick-checks
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
+            use_cross: false
             
           - os: windows-latest
             target: x86_64-pc-windows-msvc
+            use_cross: false
             
           - os: macos-latest
             target: x86_64-apple-darwin
+            use_cross: false
             
           - os: macos-latest
             target: aarch64-apple-darwin
+            use_cross: false
 
     steps:
     - name: Checkout code
@@ -134,6 +213,9 @@ jobs:
       with:
         targets: ${{ matrix.target }}
 
+    - name: Run sccache-cache
+      uses: mozilla-actions/sccache-action@v0.0.4
+
     - name: Cache dependencies
       uses: Swatinem/rust-cache@v2
       with:
@@ -142,29 +224,29 @@ jobs:
 
     - name: Build release binary
       run: cargo build --release --target ${{ matrix.target }}
+      env:
+        RUSTC_WRAPPER: "sccache"
 
-    - name: Archive binary (Unix)
+    - name: Create archive (Unix)
       if: runner.os != 'Windows'
       run: |
         cd target/${{ matrix.target }}/release
         tar czf ../../../mcp-helper-${{ matrix.target }}.tar.gz mcp-helper
         cd ../../../
-        echo "ASSET_PATH=mcp-helper-${{ matrix.target }}.tar.gz" >> $GITHUB_ENV
 
-    - name: Archive binary (Windows)
+    - name: Create archive (Windows)
       if: runner.os == 'Windows'
       shell: bash
       run: |
         cd target/${{ matrix.target }}/release
         7z a ../../../mcp-helper-${{ matrix.target }}.zip mcp-helper.exe
         cd ../../../
-        echo "ASSET_PATH=mcp-helper-${{ matrix.target }}.zip" >> $GITHUB_ENV
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: mcp-helper-${{ matrix.target }}
-        path: ${{ env.ASSET_PATH }}
+        path: mcp-helper-${{ matrix.target }}.*
         retention-days: 7
 
   # Create release when pushing a version tag
