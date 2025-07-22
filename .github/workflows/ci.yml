@@ -37,6 +37,9 @@ jobs:
           taplo fmt --check
         fi
 
+    - name: Run Clippy
+      run: cargo clippy -- -D warnings
+
   # Main test job - runs on multiple platforms
   test:
     name: Test - ${{ matrix.os }} / ${{ matrix.rust }}
@@ -69,14 +72,6 @@ jobs:
         key: ${{ matrix.os }}-${{ matrix.rust }}
         cache-all-crates: true
         cache-on-failure: true
-
-    - name: Check formatting
-      run: make fmt-check
-      if: matrix.rust == 'stable'
-
-    - name: Run linter
-      run: make lint
-      if: matrix.rust == 'stable'
 
     - name: Build
       run: make build
@@ -118,10 +113,6 @@ jobs:
 
     - name: Generate coverage report
       run: make coverage-ci
-
-    - name: Generate Clippy report for SonarQube
-      run: |
-        cargo clippy --message-format=json > clippy-report.json || true
 
     - name: SonarQube Scan
       uses: SonarSource/sonarqube-scan-action@v5
