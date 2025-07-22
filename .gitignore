@@ -22,3 +22,6 @@ target
 
 # Claude Code local files
 .claude/*.local.json
+
+lcov.info
+tarpaulin-report.html

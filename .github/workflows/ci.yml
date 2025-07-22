@@ -119,6 +119,10 @@ jobs:
     - name: Generate coverage report
       run: make coverage-ci
 
+    - name: Generate Clippy report for SonarQube
+      run: |
+        cargo clippy --message-format=json > clippy-report.json || true
+
     - name: SonarQube Scan
       uses: SonarSource/sonarqube-scan-action@v5
       env:
