@@ -26,6 +26,8 @@ Then MCP Helper is for you. **One tool, zero platform headaches.**
 
 ## Installation
 
+MCP Helper is distributed as pre-built binaries - no Rust installation required!
+
 ### Quick Install
 
 **macOS/Linux:**
@@ -322,7 +324,12 @@ If a hook fails, you can debug by running the specific make target that failed.
 
 ## Contributing
 
-We welcome contributions! The codebase is focused and approachable:
+We welcome contributions! The codebase is focused and approachable.
+
+### Prerequisites
+
+- **Rust 1.88.0 or later** - This project is built with Rust 1.88.0
+- We periodically update to newer stable versions
 
 ```bash
 # Clone the repository
