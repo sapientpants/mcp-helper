@@ -135,6 +135,7 @@ jobs:
   release-build:
     name: Release Build - ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
+    needs: [test, security-and-coverage]
     # Only run on version tags or manual dispatch
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     strategy:
