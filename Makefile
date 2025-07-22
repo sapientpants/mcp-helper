@@ -162,7 +162,7 @@ coverage:
 # Coverage for CI - doesn't open browser
 coverage-ci:
 	@echo "Generating coverage report for CI..."
-	@$(CARGO) tarpaulin --out Html || (echo "Install cargo-tarpaulin with: cargo install cargo-tarpaulin" && exit 1)
+	@$(CARGO) tarpaulin --out Html --out Lcov || (echo "Install cargo-tarpaulin with: cargo install cargo-tarpaulin" && exit 1)
 
 # Watch for changes and rebuild (requires cargo-watch)
 watch:
