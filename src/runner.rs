@@ -1,5 +1,5 @@
 use anyhow::{bail, Context, Result};
-use colored::*;
+use colored::Colorize;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
