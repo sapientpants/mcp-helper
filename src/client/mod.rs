@@ -1,6 +1,10 @@
+pub mod claude_desktop;
+
 use anyhow::Result;
 use std::collections::HashMap;
 use std::path::PathBuf;
+
+pub use claude_desktop::ClaudeDesktopClient;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ServerConfig {
@@ -59,10 +63,12 @@ impl Default for ClientRegistry {
 }
 
 pub fn detect_clients() -> Vec<Box<dyn McpClient>> {
-    let registry = ClientRegistry::new();
+    let mut registry = ClientRegistry::new();
 
-    // TODO: Register actual client implementations here
-    // registry.register(Box::new(ClaudeDesktopClient::new()));
+    // Register Claude Desktop client
+    registry.register(Box::new(ClaudeDesktopClient::new()));
+
+    // TODO: Register other client implementations here
     // registry.register(Box::new(CursorClient::new()));
     // registry.register(Box::new(VsCodeClient::new()));
     // registry.register(Box::new(WindsurfClient::new()));

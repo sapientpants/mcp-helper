@@ -145,5 +145,6 @@ fn test_mock_client_trait_methods() {
 #[test]
 fn test_detect_clients() {
     let clients = mcp_helper::client::detect_clients();
-    assert_eq!(clients.len(), 0); // No clients registered yet
+    assert_eq!(clients.len(), 1); // Claude Desktop client is now registered
+    assert_eq!(clients[0].name(), "Claude Desktop");
 }
