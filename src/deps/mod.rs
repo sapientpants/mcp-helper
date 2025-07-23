@@ -1,5 +1,9 @@
+pub mod node;
+
 use anyhow::Result;
 use std::fmt;
+
+pub use node::NodeChecker;
 
 #[derive(Debug, Clone)]
 pub struct DependencyCheck {

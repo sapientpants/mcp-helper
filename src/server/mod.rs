@@ -1,5 +1,9 @@
+pub mod npm;
+
 use anyhow::Result;
 use std::collections::HashMap;
+
+pub use npm::NpmServer;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ServerType {
@@ -80,9 +84,10 @@ pub fn detect_server_type(package: &str) -> ServerType {
         }
     } else {
         // Default to NPM for simple names
+        let (pkg, version) = parse_npm_package(package);
         ServerType::Npm {
-            package: package.to_string(),
-            version: None,
+            package: pkg,
+            version,
         }
     }
 }
