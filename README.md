@@ -3,7 +3,12 @@
 <div align="center">
 
 [![Crates.io](https://img.shields.io/crates/v/mcp-helper.svg)](https://crates.io/crates/mcp-helper)
-[![CI](https://github.com/mcp-helper/mcp-helper/actions/workflows/ci.yml/badge.svg)](https://github.com/mcp-helper/mcp-helper/actions/workflows/ci.yml)
+[![CI](https://github.com/sapientpants/mcp-helper/actions/workflows/ci.yml/badge.svg)](https://github.com/sapientpants/mcp-helper/actions/workflows/ci.yml)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=mcp-helper&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=mcp-helper)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=mcp-helper&metric=bugs)](https://sonarcloud.io/summary/new_code?id=mcp-helper)
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=mcp-helper&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=mcp-helper)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=mcp-helper&metric=coverage)](https://sonarcloud.io/summary/new_code?id=mcp-helper)
+[![Duplicated Lines (%)](https://sonarcloud.io/api/project_badges/measure?project=mcp-helper&metric=duplicated_lines_density)](https://sonarcloud.io/summary/new_code?id=mcp-helper)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform Support](https://img.shields.io/badge/platform-windows%20%7C%20macos%20%7C%20linux-lightgrey)](https://github.com/mcp-helper/mcp-helper/releases)
 
