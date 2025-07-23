@@ -1,17 +1,27 @@
-# MCP Helper - Minimum Lovable Product Implementation Plan
+# MCP Helper - Implementation Plan
+
+> **Note**: This document outlines the phased implementation approach for MCP Helper.
+> - For feature descriptions, see [features.md](features.md)
+> - For technical architecture, see [architecture.md](architecture.md)
 
 ## Executive Summary
 
-The MLP should focus on solving the #1 pain point: **making MCP servers "just work" across platforms**, especially fixing the Windows npx problem. We'll build incrementally, delivering immediate value with each phase.
+The MLP focuses on solving the #1 pain point: **making MCP servers "just work" across platforms**, especially fixing the Windows npx problem. We'll build incrementally, delivering immediate value with each phase.
+
+## Core Value Proposition
+
+**"Make MCP Just Work™"** - The cross-platform compatibility layer for MCP that eliminates platform-specific documentation and makes MCP servers work identically everywhere.
+
+For detailed scope boundaries, see [features.md](features.md#scope-boundaries).
 
 ## Phase 1: Core Runner (Week 1-2) 🎯 ✅ COMPLETE
 
 ### Features:
-1. **`mcp run <server>`** - The killer feature
-   - Platform detection (Windows/macOS/Linux)
-   - npx/npx.cmd wrapper for Windows
-   - Path separator normalization
-   - Basic error handling with clear messages
+Implements the Universal MCP Launcher (see [features.md](features.md#1-universal-mcp-launcher)):
+- **`mcp run <server>`** - Platform-agnostic server execution
+- Platform detection and npx/npx.cmd wrapper for Windows
+- Path separator normalization
+- Basic error handling with clear messages
 
 ### Justification:
 - **Solves the biggest pain point immediately** - Windows users can finally run MCP servers
@@ -54,24 +64,13 @@ The MLP should focus on solving the #1 pain point: **making MCP servers "just wo
 - **Eliminates "npx not found" errors** - Setup ensures environment is ready
 
 ### Technical Approach:
-```rust
-// Example: Platform-specific setup
-match platform {
-    Platform::Windows => {
-        // Add to PowerShell profile
-        // Update system PATH via registry
-        // Create shortcuts in Start Menu
-    }
-    Platform::MacOS => {
-        // Update ~/.zshrc or ~/.bash_profile
-        // Handle GUI app environment (launchctl)
-    }
-    Platform::Linux => {
-        // Update ~/.bashrc or ~/.zshrc
-        // Handle XDG directories
-    }
-}
-```
+Implements the PackageManager and PlatformOperations traits defined in [architecture.md](architecture.md#key-components).
+
+### Module Structure:
+See [architecture.md](architecture.md#proposed-module-structure) for detailed module layout:
+- `src/package/` - Package management abstraction
+- `src/platform/` - Platform-specific implementations  
+- `src/environment/` - PATH and environment variable handling
 
 ## Phase 3: Configuration Management (Week 5-6) ⚙️
 
@@ -93,31 +92,34 @@ match platform {
    - Environment variables
    - Command line arguments
 
+7. **`mcp config update <server>`**
+   - Update existing server configuration
+   - Preserve comments and formatting
+   - Validation before saving
+
+8. **`mcp config remove <server>`**
+   - Safe removal of server configs
+   - Confirmation prompts for safety
+   - Backup before deletion
+
 ### Justification:
 - **Enables persistence** - Servers survive restarts
 - **Multi-server support** - Users typically need multiple MCP servers
 - **Integration with Claude** - Works with the primary MCP client
 - **Configuration as code** - Version control friendly
 
-### Config File Format:
-```json
-{
-  "mcpServers": {
-    "filesystem": {
-      "command": "mcp-server-filesystem",
-      "args": ["--root", "/path/to/files"],
-      "env": {
-        "API_KEY": "secret"
-      }
-    }
-  }
-}
-```
+### Module Structure:
+- `src/config/` - Configuration management with serde/serde_json
+- `src/platform/` - Platform-specific config paths
+- Uses `directories` crate for cross-platform config locations
+
+### Technical Details:
+Implements Configuration Management features from [features.md](features.md#2-configuration-management) using the architecture's config module structure. Platform-specific paths are handled as described in [architecture.md](architecture.md#platform-specific-config-locations).
 
 ## Phase 4: Diagnostics & Polish (Week 7-8) 🏥
 
 ### Features:
-7. **`mcp doctor`**
+9. **`mcp doctor`**
    - Check Node.js installation
    - Verify npm/npx availability
    - Test PATH configuration
@@ -125,21 +127,15 @@ match platform {
    - **Auto-fix common issues when possible**
    - Platform-specific checks
 
-8. **`mcp config remove <server>`**
-   - Safe removal of server configs
-   - Confirmation prompts for safety
-   - Backup before deletion
-
-9. **`mcp config update <server>`**
-   - In-place configuration updates
-   - Preserve comments and formatting
-   - Validation before saving
-
 ### Justification:
 - **Reduces support burden** - Users can self-diagnose issues
 - **Improves user confidence** - Clear feedback on system state
-- **Completes core CRUD operations** - Full config management
 - **Prevents user frustration** - Auto-fix saves time
+
+### Module Structure:
+- `src/diagnostics/` - Diagnostic framework and checks
+- Uses `thiserror` for rich error types with context
+- Uses `tracing` for structured logging
 
 ### Example Doctor Output:
 ```
@@ -184,11 +180,22 @@ All checks passed! MCP is ready to use.
 - **Polish** - Better user experience overall
 - **Cross-team collaboration** - Path conversion helps sharing
 
+## Architecture Implementation
+
+Each phase implements specific modules from [architecture.md](architecture.md#proposed-module-structure):
+
+- **Phase 1**: Core platform abstraction (`src/platform/`, `src/runner.rs`)
+- **Phase 2**: Package management (`src/package/`, `src/environment/`)
+- **Phase 3**: Configuration system (`src/config/`)
+- **Phase 4**: Diagnostics framework (`src/diagnostics/`)
+- **Phase 5**: Utilities and enhancements (`src/utils/`)
+- **Phase 6**: IDE integration (`src/ide/`)
+
 ## Future Phases (Post-MLP)
 
 ### Phase 6: Development Tools
 - `mcp init` - Create new MCP server projects
-- `mcp generate-ide-config` - VS Code/IntelliJ setup
+- `mcp generate-ide-config` - VS Code/IntelliJ setup (src/ide/)
 - Project templates
 - Debugging helpers
 
@@ -215,19 +222,19 @@ All checks passed! MCP is ready to use.
 - **No external dependencies** beyond standard system tools
 - **Extensive Windows testing** - This is where most pain exists
 
-### Testing Strategy
-- Unit tests for all platform-specific code
-- Integration tests with real npm packages
-- Manual testing on:
-  - Windows 10/11 (cmd, PowerShell, Git Bash)
-  - macOS 12+ (Intel and Apple Silicon)
-  - Ubuntu 20.04+ and other Linux distributions
+### Technical Considerations
 
-### Performance Goals
+#### Testing Strategy
+See [architecture.md](architecture.md#testing-strategy) for comprehensive testing approach.
+
+#### Performance Goals
 - Startup time < 100ms
 - No perceptible delay for common operations
 - Minimal memory footprint
 - No background processes
+
+#### Dependencies
+Core dependencies are listed in [architecture.md](architecture.md#dependencies-to-add).
 
 ## Why This Order?
 

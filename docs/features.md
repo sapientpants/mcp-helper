@@ -1,75 +1,58 @@
-# MCP Helper - Feature Planning Document
+# MCP Helper - Features
 
-> **Note**: This is an internal planning document that outlines the core features and design philosophy of MCP Helper. 
-> For user-facing documentation, see [README.md](../README.md).
+> **Note**: This document describes the user-facing features of MCP Helper.
+> - For technical implementation details, see [architecture.md](architecture.md)
+> - For the implementation timeline, see [plan.md](plan.md)
+> - For user documentation, see [README.md](../README.md)
 
 ## Overview
 
-MCP Helper is a cross-platform tool designed to eliminate compatibility issues when working with Model Context Protocol (MCP) servers. This document outlines the core features and scope boundaries.
+MCP Helper is a cross-platform tool that makes Model Context Protocol (MCP) servers "just work" on any operating system. Think of it like `nvm` for MCP - it handles all platform-specific compatibility issues transparently.
 
-## Core Features - Pure Cross-Platform Compatibility
+## Core Features
 
 ### 1. Universal MCP Launcher
 
 ```bash
-mcp run <server-name>     # Handles npx/path issues transparently
-mcp install <server-name> # Works identically on Windows/Mac/Linux
+mcp run <server-name>     # Run any MCP server on any OS
+mcp install <server-name> # Install servers with automatic compatibility
 ```
 
-**Key capabilities:**
-- Windows npx wrapper built-in - no manual CMD fixes needed
-- Path translation - automatically converts `/` to `\` and handles escaping
-- Environment inheritance - fixes GUI application env variable issues
+### 2. Configuration Management
 
-### 2. Configuration File Management
-
-**Auto-detects where each MCP client stores configs:**
-- Windows: `%APPDATA%\Claude\`
-- macOS: `~/Library/Application Support/Claude/`
-- Linux: `~/.config/Claude/`
-
-**Unified commands that work everywhere:**
 ```bash
-mcp config add my-server      # Adds to correct location automatically
-mcp config list               # Shows all configured servers
-mcp config show my-server     # Display server configuration details
-mcp config update my-server   # Update existing server configuration
-mcp config remove my-server   # Remove server configuration
+mcp config add <server>     # Add server to MCP client config
+mcp config list             # List all configured servers
+mcp config show <server>    # Display server configuration
+mcp config update <server>  # Update server configuration
+mcp config remove <server>  # Remove server configuration
 ```
 
-### 3. Development Environment Normalization
-
-- Node.js version compatibility layer
-- Package manager abstraction (npm/yarn/pnpm differences)
-- IDE configuration generators (VS Code, IntelliJ, etc.)
+### 3. Development Tools
 
 ```bash
-mcp init                    # Sets up project with right configs for your OS
-mcp generate-ide-config     # Creates .vscode/settings.json that works
+mcp init                    # Initialize new MCP server project
+mcp generate-ide-config     # Generate IDE configuration files
 ```
 
 ### 4. Path and Environment Utilities
 
-- Path converters for config files
-- Environment variable helpers
-
 ```bash
-# Developers never need to think about platform differences
-mcp env set API_KEY=value   # Handles platform-specific storage
-mcp path convert ./my/path  # Returns platform-appropriate path
+mcp env set KEY=value       # Set environment variables
+mcp path convert <path>     # Convert paths between platforms
 ```
 
-### 5. Installation Verification
-
-- Compatibility checker before installation
-- Dependency validator for platform-specific requirements
+### 5. Diagnostics and Verification
 
 ```bash
-mcp doctor                  # "npx is not in PATH on Windows"
-mcp verify my-server        # "This server requires Unix paths"
+mcp setup                   # One-time system setup
+mcp doctor                  # Diagnose and fix common issues
+mcp verify <server>         # Check server compatibility
 ```
 
-## What This Does NOT Include
+## Scope Boundaries
+
+MCP Helper focuses exclusively on cross-platform compatibility and does NOT include:
 
 - ❌ Security features (authentication, authorization)
 - ❌ Runtime monitoring or resource limits
@@ -77,25 +60,6 @@ mcp verify my-server        # "This server requires Unix paths"
 - ❌ Network traffic inspection
 - ❌ Marketplace or registry features
 
-## The Focused Value Proposition
+## Value Proposition
 
-This is the "Make MCP Just Work™" tool:
-
-- Install it once, and MCP servers work the same on any OS
-- No more debugging Windows-specific issues
-- No more "works on my machine" problems
-- No overlap with security/runtime concerns
-
-Think of it like `nvm` (Node Version Manager) - it doesn't do security or monitoring, it just makes Node.js work consistently everywhere. This does the same for MCP.
-
-## MVP: The Minimum Lovable Product
-
-Just three commands that solve 90% of the pain:
-
-```bash
-mcp setup                   # One-time fix for your OS
-mcp install <server>        # Actually works on Windows
-mcp run <server>            # No path escaping needed
-```
-
-That's it. Pure developer experience improvement, no feature creep into security or operations territory.
+**"Make MCP Just Work™"** - Install it once, and MCP servers work identically on Windows, macOS, and Linux. No more platform-specific documentation, no more "works on my machine" problems.
