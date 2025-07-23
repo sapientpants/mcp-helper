@@ -25,3 +25,6 @@ target
 
 lcov.info
 tarpaulin-report.html
+
+# Log files
+logs/
