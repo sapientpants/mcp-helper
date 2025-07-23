@@ -32,17 +32,17 @@ This document provides a detailed task breakdown for implementing the `mcp insta
   - [x] Add config backup before modifications
   - [x] Validate JSON structure before/after modifications
 
-### 1.3 NPM Server Support
-- [ ] Create `src/server/npm.rs`
+### 1.3 NPM Server Support ✅ COMPLETED
+- [x] Create `src/server/npm.rs`
   - [x] Detect NPM packages (@ prefix, contains /) ✅ Implemented in server/mod.rs
-  - [ ] Generate NPX command with proper arguments
+  - [x] Generate NPX command with proper arguments
   - [x] Handle scoped packages (@org/package) ✅ Implemented in server/mod.rs
   - [x] Add support for specific versions (@1.0.0) ✅ Implemented in server/mod.rs
-- [ ] Create `src/deps/node.rs`
-  - [ ] Implement Node.js detection using `which` crate
-  - [ ] Parse version from `node --version`
-  - [ ] Compare versions using semver logic
-  - [ ] Generate platform-specific install instructions
+- [x] Create `src/deps/node.rs`
+  - [x] Implement Node.js detection using `which` crate
+  - [x] Parse version from `node --version`
+  - [x] Compare versions using semver logic
+  - [x] Generate platform-specific install instructions
 
 ### 1.4 Basic Install Command
 - [ ] Update `src/main.rs` install command handler
