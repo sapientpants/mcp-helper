@@ -13,6 +13,8 @@ env:
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
   RUSTFLAGS: "-D warnings"
+  # Minimum supported Rust version (MSRV) - update this and the test matrix when changing
+  RUST_VERSION: "1.88.0"
 
 jobs:
   # Quick checks that should fail fast
@@ -49,21 +51,17 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        rust: [stable]
-        include:
-          # Test on explicit Rust version we use for releases
-          # We manually update this when we want to use newer features
-          - os: ubuntu-latest
-            rust: "1.88.0"
+        # Test on explicit Rust version we use for releases
+        # We manually update this when we want to use newer features
+        rust: ["1.88.0"]
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
     - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
+      uses: dtolnay/rust-toolchain@${{ matrix.rust }}
       with:
-        toolchain: ${{ matrix.rust }}
         components: rustfmt, clippy
 
     - name: Cache dependencies
