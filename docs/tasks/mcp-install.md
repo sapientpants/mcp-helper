@@ -56,11 +56,11 @@ This document provides a detailed task breakdown for implementing the `mcp insta
   - [x] Validate user input
   - [x] Store config in appropriate format
 
-### 1.5 Dependency Management
-- [ ] Create `src/deps/version.rs`
-  - [ ] Implement version parsing (semver)
-  - [ ] Add version comparison logic
-  - [ ] Support version ranges (^, ~, >=)
+### 1.5 Dependency Management ✅ COMPLETED
+- [x] Create `src/deps/version.rs`
+  - [x] Implement version parsing (semver)
+  - [x] Add version comparison logic
+  - [x] Support version ranges (^, ~, >=)
 - [x] Create `src/deps/installers.rs` ✅ Implemented in deps/mod.rs
   - [x] Windows: winget, chocolatey, scoop commands
   - [x] macOS: Homebrew, MacPorts commands
