@@ -21,22 +21,22 @@ fn test_dependency_name() {
 #[test]
 fn test_dependency_status_display() {
     let installed = DependencyStatus::Installed { version: None };
-    assert_eq!(format!("{}", installed), "Installed");
+    assert_eq!(format!("{installed}"), "Installed");
 
     let installed_with_version = DependencyStatus::Installed {
         version: Some("18.0.0".to_string()),
     };
-    assert_eq!(format!("{}", installed_with_version), "Installed (18.0.0)");
+    assert_eq!(format!("{installed_with_version}"), "Installed (18.0.0)");
 
     let missing = DependencyStatus::Missing;
-    assert_eq!(format!("{}", missing), "Not installed");
+    assert_eq!(format!("{missing}"), "Not installed");
 
     let mismatch = DependencyStatus::VersionMismatch {
         installed: "16.0.0".to_string(),
         required: "18.0.0".to_string(),
     };
     assert_eq!(
-        format!("{}", mismatch),
+        format!("{mismatch}"),
         "Version mismatch (installed: 16.0.0, required: 18.0.0)"
     );
 }

@@ -147,13 +147,9 @@ impl ServerRunner {
                 }
                 let mut cmd_args = vec![server_str.to_string()];
                 cmd_args.extend(args.iter().cloned());
-                return Ok((
-                    "cmd.exe".to_string(),
-                    vec!["/c".to_string(), "npx.cmd".to_string()]
-                        .into_iter()
-                        .chain(cmd_args)
-                        .collect(),
-                ));
+                let mut final_args = vec!["/c".to_string(), "npx.cmd".to_string()];
+                final_args.extend(cmd_args);
+                return Ok(("cmd.exe".to_string(), final_args));
             }
 
             // Try regular npx
@@ -283,9 +279,9 @@ mod tests {
         let (cmd, args) = runner
             .get_windows_command(
                 &PathBuf::from("my-server"),
-                &vec!["arg1".to_string(), "arg2".to_string()],
+                &["arg1".to_string(), "arg2".to_string()],
             )
-            .unwrap_or(("npx".to_string(), vec![]));
+            .unwrap_or_else(|_| ("npx".to_string(), vec![]));
 
         // We expect either npx.cmd through cmd.exe or direct npx
         assert!(cmd == "cmd.exe" || cmd == "npx");
@@ -299,8 +295,7 @@ mod tests {
         let runner = ServerRunner::new(Platform::Linux, false);
 
         // Test npm package command
-        let result =
-            runner.get_unix_command(&PathBuf::from("my-server"), &vec!["arg1".to_string()]);
+        let result = runner.get_unix_command(&PathBuf::from("my-server"), &["arg1".to_string()]);
 
         // This will fail if npx is not available, which is expected in test environment
         if let Ok((cmd, args)) = result {

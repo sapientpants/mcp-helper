@@ -23,7 +23,7 @@ endif
 
 # Phony targets
 .PHONY: all help clean build build-release test test-all test-unit test-integration \
-        run install fmt fmt-check lint check doc audit hooks dev ci quick-test \
+        run install fmt fmt-check lint lint-all check doc audit hooks dev ci quick-test \
         bench coverage coverage-ci watch pre-push pre-commit
 
 # Help target
@@ -107,6 +107,12 @@ lint:
 	@$(CARGO) clippy -- -D warnings
 	@echo "✓ Linting complete"
 
+# Run linter on all targets including tests
+lint-all:
+	@echo "Running clippy on all targets..."
+	@$(CARGO) clippy --all-targets -- -D warnings
+	@echo "✓ Linting complete"
+
 # Check code without building
 check:
 	@echo "Checking code..."
@@ -179,5 +185,6 @@ pre-push: fmt-check lint test audit
 	@echo "✓ All pre-push checks passed"
 
 # Pre-commit checks - quick checks before committing
-pre-commit: fmt-check lint quick-test
+# Now includes linting all targets to catch test issues
+pre-commit: fmt-check lint-all quick-test
 	@echo "✓ All pre-commit checks passed"

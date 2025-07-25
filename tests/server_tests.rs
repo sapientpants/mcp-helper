@@ -47,7 +47,7 @@ fn test_detect_binary() {
                 "https://github.com/owner/repo/releases/download/v1.0/binary"
             );
         }
-        _ => panic!("Expected Binary server type, got: {:?}", result),
+        _ => panic!("Expected Binary server type, got: {result:?}"),
     }
 }
 

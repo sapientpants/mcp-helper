@@ -115,12 +115,11 @@ fn test_help_for_each_command() {
     for cmd in &commands {
         let output = run_cli(&[cmd, "--help"]);
 
-        assert!(output.status.success(), "Help failed for command: {}", cmd);
+        assert!(output.status.success(), "Help failed for command: {cmd}");
         let stdout = String::from_utf8_lossy(&output.stdout);
         assert!(
             !stdout.is_empty(),
-            "Help output is empty for command: {}",
-            cmd
+            "Help output is empty for command: {cmd}"
         );
     }
 }

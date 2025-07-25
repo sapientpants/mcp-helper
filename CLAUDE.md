@@ -22,9 +22,10 @@ MCP Helper is a cross-platform tool written in Rust that eliminates compatibilit
 ### Code Quality
 - `make fmt` - Format code
 - `make fmt-check` - Check formatting without changes
-- `make lint` - Run clippy linter
+- `make lint` - Run clippy linter on library code
+- `make lint-all` - Run clippy linter on all targets including tests
 - `make check` - Run cargo check
-- `make pre-commit` - Run all pre-commit checks (fmt-check + lint + quick-test)
+- `make pre-commit` - Run all pre-commit checks (fmt-check + lint-all + quick-test)
 
 ### Development Workflow
 - `make dev` - Run full development checks (fmt + lint + build + test)
@@ -121,8 +122,8 @@ MCP Helper is a cross-platform tool written in Rust that eliminates compatibilit
 ### Error Handling Philosophy
 Every error should be actionable - tell users exactly how to fix the issue. Use the `colored` crate for clear, readable error messages.
 
-### Git Hooks
-Pre-commit hooks are configured via rusty-hook to run formatting and linting checks automatically.
+### Git Hooks & Trunk-Based Development
+Pre-commit hooks are configured via rusty-hook to run formatting and linting checks automatically. The project uses trunk-based development, so the pre-commit hook runs `lint-all` to catch issues in both library and test code before they reach main. This ensures CI stays green despite the ~1 second overhead compared to linting library code only.
 
 ### Performance Goals
 - Startup time < 100ms

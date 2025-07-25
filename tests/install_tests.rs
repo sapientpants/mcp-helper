@@ -108,7 +108,7 @@ impl DependencyChecker for MockDependencyChecker {
 fn test_install_command_creation() {
     let _install = InstallCommand::new(false);
     // Should create successfully
-    assert!(true); // Basic smoke test
+    // Basic smoke test - just ensure it creates successfully
 }
 
 #[test]
@@ -286,7 +286,7 @@ fn test_dependency_status_variants() {
     }
 
     match missing {
-        DependencyStatus::Missing => assert!(true),
+        DependencyStatus::Missing => {}
         _ => panic!("Expected Missing variant"),
     }
 

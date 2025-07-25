@@ -165,7 +165,7 @@ mod tests {
         let platform = detect_platform();
         // Just ensure it returns something valid
         match platform {
-            Platform::Windows | Platform::MacOS | Platform::Linux => assert!(true),
+            Platform::Windows | Platform::MacOS | Platform::Linux => {}
         }
     }
 }
