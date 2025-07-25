@@ -1,8 +1,8 @@
 use crate::deps::{
-    get_install_instructions, Dependency, DependencyCheck, DependencyChecker, DependencyStatus,
+    get_install_instructions, version::VersionHelper, Dependency, DependencyCheck,
+    DependencyChecker, DependencyStatus,
 };
 use anyhow::{Context, Result};
-use semver::Version;
 use std::process::Command;
 use which::which;
 
@@ -43,34 +43,31 @@ impl NodeChecker {
         let version_str = String::from_utf8(output.stdout)
             .context("Failed to parse node version output as UTF-8")?;
 
-        // Node outputs version as "v16.14.0", we need to strip the 'v'
-        let version_str = version_str.trim();
-        let version_str = version_str.strip_prefix('v').unwrap_or(version_str);
-
-        Ok(version_str.to_string())
+        Ok(version_str.trim().to_string())
     }
 
     fn compare_versions(&self, installed: &str) -> Result<DependencyStatus> {
+        // Parse the installed version (handles 'v' prefix)
+        let installed_version = VersionHelper::parse_version(installed)?;
+        let installed_str = installed_version.to_string();
+
         if let Some(min_required) = &self.min_version {
-            let installed_version =
-                Version::parse(installed).context("Failed to parse installed Node.js version")?;
+            // Use VersionHelper to check if the installed version satisfies the requirement
+            let satisfies = VersionHelper::satisfies(&installed_str, &format!(">={min_required}"))?;
 
-            let required_version =
-                Version::parse(min_required).context("Failed to parse required Node.js version")?;
-
-            if installed_version < required_version {
+            if !satisfies {
                 Ok(DependencyStatus::VersionMismatch {
-                    installed: installed.to_string(),
+                    installed: installed_str,
                     required: min_required.clone(),
                 })
             } else {
                 Ok(DependencyStatus::Installed {
-                    version: Some(installed.to_string()),
+                    version: Some(installed_str),
                 })
             }
         } else {
             Ok(DependencyStatus::Installed {
-                version: Some(installed.to_string()),
+                version: Some(installed_str),
             })
         }
     }
@@ -169,7 +166,13 @@ mod tests {
     #[test]
     fn test_version_parsing() {
         // Test that version strings can be parsed
-        let version = Version::parse("16.14.0").unwrap();
+        let version = VersionHelper::parse_version("16.14.0").unwrap();
+        assert_eq!(version.major, 16);
+        assert_eq!(version.minor, 14);
+        assert_eq!(version.patch, 0);
+
+        // Test with 'v' prefix
+        let version = VersionHelper::parse_version("v16.14.0").unwrap();
         assert_eq!(version.major, 16);
         assert_eq!(version.minor, 14);
         assert_eq!(version.patch, 0);
@@ -177,9 +180,9 @@ mod tests {
 
     #[test]
     fn test_version_comparison() {
-        let v1 = Version::parse("16.0.0").unwrap();
-        let v2 = Version::parse("18.0.0").unwrap();
-        assert!(v1 < v2);
+        use std::cmp::Ordering;
+        let ordering = VersionHelper::compare("16.0.0", "18.0.0").unwrap();
+        assert_eq!(ordering, Ordering::Less);
     }
 
     #[test]
