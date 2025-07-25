@@ -1,5 +1,6 @@
 pub mod client;
 pub mod deps;
+pub mod install;
 pub mod runner;
 pub mod server;
 

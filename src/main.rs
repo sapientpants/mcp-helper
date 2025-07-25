@@ -8,6 +8,9 @@ mod runner;
 // Import Platform from runner module
 use runner::Platform;
 
+// Import from mcp_helper lib
+use mcp_helper::install::InstallCommand;
+
 #[derive(Parser)]
 #[command(name = "mcp")]
 #[command(author = "MCP Helper Contributors")]
@@ -83,7 +86,8 @@ fn main() -> Result<()> {
         }
         Commands::Install { server } => {
             println!("{} Installing MCP server: {}", "→".green(), server.cyan());
-            println!("{}", "Install command not yet implemented".yellow());
+            let install = InstallCommand::new(cli.verbose);
+            install.execute(&server)?;
         }
         Commands::Setup => {
             println!("{}", "🔧 Running MCP Helper setup...".blue().bold());

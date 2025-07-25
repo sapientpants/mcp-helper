@@ -236,6 +236,26 @@ impl McpServer for MockServer {
             _ => Ok(("echo".to_string(), vec!["test".to_string()])),
         }
     }
+
+    fn dependency(&self) -> Box<dyn mcp_helper::deps::DependencyChecker> {
+        use mcp_helper::deps::{Dependency, DependencyCheck, DependencyChecker, DependencyStatus};
+
+        struct MockDependencyChecker;
+
+        impl DependencyChecker for MockDependencyChecker {
+            fn check(&self) -> anyhow::Result<DependencyCheck> {
+                Ok(DependencyCheck {
+                    dependency: Dependency::NodeJs { min_version: None },
+                    status: DependencyStatus::Installed {
+                        version: Some("18.0.0".to_string()),
+                    },
+                    install_instructions: None,
+                })
+            }
+        }
+
+        Box::new(MockDependencyChecker)
+    }
 }
 
 #[test]

@@ -3,6 +3,8 @@ pub mod npm;
 use anyhow::Result;
 use std::collections::HashMap;
 
+use crate::deps::DependencyChecker;
+
 pub use npm::NpmServer;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -57,6 +59,8 @@ pub trait McpServer: Send + Sync {
     fn validate_config(&self, config: &HashMap<String, String>) -> Result<()>;
 
     fn generate_command(&self) -> Result<(String, Vec<String>)>;
+
+    fn dependency(&self) -> Box<dyn DependencyChecker>;
 }
 
 pub fn detect_server_type(package: &str) -> ServerType {

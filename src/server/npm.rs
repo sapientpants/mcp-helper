@@ -151,6 +151,11 @@ impl McpServer for NpmServer {
 
         Ok((npx_cmd, args))
     }
+
+    fn dependency(&self) -> Box<dyn crate::deps::DependencyChecker> {
+        use crate::deps::node::NodeChecker;
+        Box::new(NodeChecker::new().with_min_version("16.0.0".to_string()))
+    }
 }
 
 #[cfg(test)]
