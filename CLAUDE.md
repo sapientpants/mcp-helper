@@ -36,6 +36,10 @@ MCP Helper is a cross-platform tool written in Rust that eliminates compatibilit
 - `src/main.rs` - CLI entry point using clap for argument parsing
 - `src/lib.rs` - Library root, re-exports public APIs
 - `src/runner.rs` - Core server runner with platform abstraction
+- `src/client/` - MCP client implementations (Claude Desktop, etc.)
+- `src/server/` - MCP server types and implementations (NPM, Binary, etc.)
+- `src/deps/` - Dependency checking and installation instructions
+- `src/install.rs` - Install command implementation with interactive configuration
 
 ### Key Components
 
@@ -49,18 +53,63 @@ MCP Helper is a cross-platform tool written in Rust that eliminates compatibilit
 - Normalizes path separators for cross-platform compatibility
 - Executes servers with proper error handling
 
+**McpClient Trait**: Abstraction for different MCP clients:
+- Provides unified interface for client configuration
+- Supports Claude Desktop, with extensibility for Cursor, VS Code, etc.
+- Handles platform-specific config paths and JSON preservation
+
+**McpServer Trait**: Abstraction for different server types:
+- NPM packages (with scoped package and version support)
+- Binary releases (planned)
+- Python scripts (planned)
+- Docker containers (planned)
+
+**Dependency Management**: Intelligent dependency checking:
+- Detects missing dependencies (Node.js, Python, Docker, etc.)
+- Provides platform-specific installation instructions
+- Supports version requirements and validation
+
+**Install Command**: Interactive server installation:
+- Auto-detects installed MCP clients
+- Checks and validates dependencies before installation
+- Prompts for required and optional configuration
+- Updates client configs with atomic file operations
+
+### Implementation Progress
+
+**Completed Features:**
+- ✅ `mcp run` - Cross-platform server execution
+- ✅ Core architecture (client, server, deps modules)
+- ✅ Claude Desktop client support
+- ✅ NPM server support with version handling
+- ✅ Dependency checking with install instructions
+- ✅ `mcp install` - Interactive server installation (NPM servers)
+
+**In Progress:**
+- 📦 Additional client support (Cursor, VS Code, Windsurf)
+- 📦 Binary server downloads
+- 📦 Python server support
+
 ### Implementation Phases (from docs/plan.md)
 - Phase 1: Core Runner ✅ COMPLETE - Basic `mcp run` command
-- Phase 2: Installation & Setup 📦 - `mcp install` and `mcp setup`
+- Phase 2: Installation & Setup 🚧 IN PROGRESS - `mcp install` (NPM ✅) and `mcp setup`
 - Phase 3: Configuration Management ⚙️ - Config CRUD operations
 - Phase 4: Diagnostics & Polish 🏥 - `mcp doctor` and auto-fixes
 - Phase 5: Enhanced Features 🚀 - Path conversion, env management
 
 ### Testing Approach
 - Platform-specific behavior tested with mocks
-- Integration tests in `tests/cli_tests.rs`
-- Target: >80% code coverage
+- All tests moved to `tests/` directory for better organization
+- Integration tests for CLI, clients, servers, dependencies, and install command
+- Target: >80% code coverage (currently achieving 100% for new modules)
 - CI runs tests on Windows, macOS, and Linux
+
+### Dependencies Added
+- `serde` & `serde_json` - JSON serialization with order preservation
+- `directories` - Cross-platform user directories
+- `tempfile` - Safe atomic file operations
+- `semver` - Semantic version parsing and comparison
+- `dialoguer` - Interactive CLI prompts and multi-select
 
 ## Important Context
 
@@ -90,6 +139,24 @@ The codebase will expand to include:
 - `diagnostics/` - Doctor command implementation
 - `ide/` - IDE configuration generators
 
+## Current Capabilities
+
+The `mcp install` command now supports:
+- **NPM Server Installation**: Installs any NPM-based MCP server
+  - Handles scoped packages (e.g., `@modelcontextprotocol/server-filesystem`)
+  - Supports version specifications (e.g., `express@4.18.0`)
+- **Dependency Validation**: Checks for Node.js with version requirements
+- **Interactive Configuration**: Prompts for required and optional settings
+- **Multi-Client Support**: Can install to multiple MCP clients simultaneously
+- **Safe Config Updates**: Atomic writes with automatic backups
+
+Example usage:
+```bash
+mcp install @modelcontextprotocol/server-filesystem
+mcp install @anthropic/mcp-server-slack
+mcp install some-mcp-server@1.2.3
+```
+
 ## Working with MCP Helper
 
 When implementing new features:
@@ -98,5 +165,7 @@ When implementing new features:
 3. Write comprehensive tests, especially for Windows-specific behavior
 4. Keep error messages actionable and helpful
 5. Use the existing platform abstraction patterns
+6. Use trait-based abstractions for extensibility (McpClient, McpServer, DependencyChecker)
+7. Prefer interactive prompts over command-line flags for better UX
 
 The project uses standard Rust tooling with Make for convenience. All CI checks can be run locally with `make ci`.
