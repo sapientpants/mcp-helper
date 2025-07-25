@@ -54,6 +54,7 @@ impl McpClient for MockClient {
 }
 
 // Mock server for testing
+#[allow(dead_code)]
 struct MockServer {
     metadata: ServerMetadata,
     dependency_satisfied: bool,
@@ -80,6 +81,7 @@ impl McpServer for MockServer {
 }
 
 // Mock dependency checker
+#[allow(dead_code)]
 struct MockDependencyChecker {
     satisfied: bool,
 }
