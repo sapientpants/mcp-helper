@@ -68,7 +68,12 @@ fn test_npm_server_install_flow() {
     let command_result = server.generate_command();
     match command_result {
         Ok((cmd, args)) => {
+            // Handle platform-specific npx command
+            #[cfg(target_os = "windows")]
+            assert_eq!(cmd, "npx.cmd");
+            #[cfg(not(target_os = "windows"))]
             assert_eq!(cmd, "npx");
+
             assert!(args.contains(&"--yes".to_string()));
             assert!(args.contains(&"@modelcontextprotocol/server-filesystem".to_string()));
             assert!(args.contains(&"--stdio".to_string()));
