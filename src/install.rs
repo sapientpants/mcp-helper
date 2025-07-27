@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use crate::client::{detect_clients, ClientRegistry, ServerConfig};
 use crate::deps::{Dependency, DependencyStatus};
 use crate::error::{McpError, Result};
-use crate::server::{detect_server_type, ConfigFieldType, McpServer, ServerType};
+use crate::server::{detect_server_type, ConfigField, ConfigFieldType, McpServer, ServerType};
 
 pub struct InstallCommand {
     client_registry: ClientRegistry,
@@ -214,6 +214,81 @@ impl InstallCommand {
         }
     }
 
+    fn build_field_prompt(field: &ConfigField, is_required: bool) -> String {
+        match (&field.description, is_required) {
+            (Some(desc), true) => desc.clone(),
+            (Some(desc), false) => format!("{desc} (optional)"),
+            (None, true) => field.name.clone(),
+            (None, false) => format!("{} (optional)", field.name),
+        }
+    }
+
+    fn prompt_string_field(
+        &self,
+        field: &ConfigField,
+        prompt: &str,
+        is_required: bool,
+    ) -> Result<Option<String>> {
+        let mut input = Input::<String>::new().with_prompt(prompt);
+
+        if let Some(default) = &field.default {
+            input = input.default(default.clone());
+        }
+
+        if !is_required && field.default.is_none() {
+            input = input.allow_empty(true);
+        }
+
+        let value = input.interact_text()?;
+
+        if value.is_empty() && !is_required {
+            Ok(None)
+        } else {
+            Ok(Some(value))
+        }
+    }
+
+    fn prompt_number_field(
+        &self,
+        field: &ConfigField,
+        prompt: &str,
+        is_required: bool,
+        server_name: &str,
+    ) -> Result<Option<String>> {
+        let input = Input::<String>::new()
+            .with_prompt(prompt)
+            .allow_empty(!is_required)
+            .interact_text()?;
+
+        if input.is_empty() && !is_required {
+            return Ok(None);
+        }
+
+        let _: f64 = input.parse().map_err(|_| {
+            McpError::configuration_required(
+                server_name,
+                vec![field.name.clone()],
+                vec![(field.name.clone(), "Must be a valid number".to_string())],
+            )
+        })?;
+        Ok(Some(input))
+    }
+
+    fn prompt_boolean_field(&self, field: &ConfigField, prompt: &str) -> Result<String> {
+        let default = field
+            .default
+            .as_ref()
+            .and_then(|v| v.parse::<bool>().ok())
+            .unwrap_or(false);
+
+        let value = Confirm::new()
+            .with_prompt(prompt)
+            .default(default)
+            .interact()?;
+
+        Ok(value.to_string())
+    }
+
     fn prompt_configuration(&self, server: &dyn McpServer) -> Result<HashMap<String, String>> {
         let metadata = server.metadata();
         let mut config = HashMap::new();
@@ -238,71 +313,22 @@ impl InstallCommand {
                 .required_config
                 .iter()
                 .any(|f| f.name == field.name);
-            let prompt = if let Some(desc) = &field.description {
-                if is_required {
-                    desc.clone()
-                } else {
-                    format!("{desc} (optional)")
-                }
-            } else if is_required {
-                field.name.clone()
-            } else {
-                format!("{} (optional)", field.name)
-            };
+            let prompt = Self::build_field_prompt(field, is_required);
 
             let value = match field.field_type {
                 ConfigFieldType::String | ConfigFieldType::Path | ConfigFieldType::Url => {
-                    let mut input = Input::<String>::new().with_prompt(&prompt);
-
-                    if let Some(default) = &field.default {
-                        input = input.default(default.clone());
+                    match self.prompt_string_field(field, &prompt, is_required)? {
+                        Some(v) => v,
+                        None => continue,
                     }
-
-                    if !is_required && field.default.is_none() {
-                        input = input.allow_empty(true);
-                    }
-
-                    let value = input.interact_text()?;
-
-                    if value.is_empty() && !is_required {
-                        continue;
-                    }
-
-                    value
                 }
                 ConfigFieldType::Number => {
-                    let input = Input::<String>::new()
-                        .with_prompt(&prompt)
-                        .allow_empty(!is_required)
-                        .interact_text()?;
-
-                    if input.is_empty() && !is_required {
-                        continue;
+                    match self.prompt_number_field(field, &prompt, is_required, &metadata.name)? {
+                        Some(v) => v,
+                        None => continue,
                     }
-
-                    let _: f64 = input.parse().map_err(|_| {
-                        McpError::configuration_required(
-                            &server.metadata().name,
-                            vec![field.name.clone()],
-                            vec![(field.name.clone(), "Must be a valid number".to_string())],
-                        )
-                    })?;
-                    input
                 }
-                ConfigFieldType::Boolean => {
-                    let default = field
-                        .default
-                        .as_ref()
-                        .and_then(|v| v.parse::<bool>().ok())
-                        .unwrap_or(false);
-
-                    let value = Confirm::new()
-                        .with_prompt(&prompt)
-                        .default(default)
-                        .interact()?;
-
-                    value.to_string()
-                }
+                ConfigFieldType::Boolean => self.prompt_boolean_field(field, &prompt)?,
             };
 
             config.insert(field.name.clone(), value);
