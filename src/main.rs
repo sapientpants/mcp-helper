@@ -73,6 +73,13 @@ enum ConfigAction {
     },
 }
 
+fn print_not_implemented(command: &str) {
+    println!(
+        "{}",
+        format!("{command} command not yet implemented").yellow()
+    );
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -92,18 +99,18 @@ fn main() {
         }
         Commands::Setup => {
             println!("{}", "🔧 Running MCP Helper setup...".blue().bold());
-            println!("{}", "Setup command not yet implemented".yellow());
+            print_not_implemented("Setup");
             Ok(())
         }
         Commands::Config { action } => {
             match action {
                 ConfigAction::Add { server } => {
                     println!("{} Adding server to config: {}", "→".green(), server.cyan());
-                    println!("{}", "Config add command not yet implemented".yellow());
+                    print_not_implemented("Config add");
                 }
                 ConfigAction::List => {
                     println!("{}", "📋 Configured MCP servers:".blue().bold());
-                    println!("{}", "Config list command not yet implemented".yellow());
+                    print_not_implemented("Config list");
                 }
                 ConfigAction::Remove { server } => {
                     println!(
@@ -111,14 +118,14 @@ fn main() {
                         "→".green(),
                         server.cyan()
                     );
-                    println!("{}", "Config remove command not yet implemented".yellow());
+                    print_not_implemented("Config remove");
                 }
             }
             Ok(())
         }
         Commands::Doctor => {
             println!("{}", "🏥 Running MCP diagnostics...".blue().bold());
-            println!("{}", "Doctor command not yet implemented".yellow());
+            print_not_implemented("Doctor");
             Ok(())
         }
     };

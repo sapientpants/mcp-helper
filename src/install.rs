@@ -1,4 +1,4 @@
-use colored::*;
+use colored::Colorize;
 use dialoguer::{Confirm, Input};
 use std::collections::HashMap;
 
@@ -84,53 +84,66 @@ impl InstallCommand {
         }
     }
 
+    fn get_dependency_name(dependency: &Dependency) -> &'static str {
+        match dependency {
+            Dependency::NodeJs { .. } => "Node.js",
+            Dependency::Python { .. } => "Python",
+            Dependency::Docker => "Docker",
+            Dependency::Git => "Git",
+        }
+    }
+
+    fn handle_installed_dependency(dep_name: &str, version: &Option<String>) -> Result<()> {
+        println!(
+            "  {} {} is installed{}",
+            "✓".green(),
+            dep_name,
+            if let Some(v) = version {
+                format!(" (version {v})")
+            } else {
+                String::new()
+            }
+        );
+        Ok(())
+    }
+
+    fn handle_missing_dependency(
+        dep_name: &str,
+        check: &crate::deps::DependencyCheck,
+    ) -> Result<()> {
+        println!("  {} {} is not installed", "✗".red(), dep_name);
+
+        if let Some(instructions) = &check.install_instructions {
+            let required_version = match &check.dependency {
+                Dependency::NodeJs { min_version } => min_version.clone(),
+                Dependency::Python { min_version } => min_version.clone(),
+                _ => None,
+            };
+            return Err(McpError::missing_dependency(
+                dep_name,
+                required_version,
+                instructions.clone(),
+            ));
+        }
+        Err(McpError::Other(anyhow::anyhow!(
+            "Required dependency {} is not installed",
+            dep_name
+        )))
+    }
+
     fn check_dependencies(&self, server: &dyn McpServer) -> Result<()> {
         println!("{} Checking dependencies...", "🔍".blue());
 
         let dependency = server.dependency();
         let check = dependency.check()?;
 
-        let dep_name = match &check.dependency {
-            Dependency::NodeJs { .. } => "Node.js",
-            Dependency::Python { .. } => "Python",
-            Dependency::Docker => "Docker",
-            Dependency::Git => "Git",
-        };
+        let dep_name = Self::get_dependency_name(&check.dependency);
 
         match &check.status {
             DependencyStatus::Installed { version } => {
-                println!(
-                    "  {} {} is installed{}",
-                    "✓".green(),
-                    dep_name,
-                    if let Some(v) = version {
-                        format!(" (version {v})")
-                    } else {
-                        String::new()
-                    }
-                );
-                Ok(())
+                Self::handle_installed_dependency(dep_name, version)
             }
-            DependencyStatus::Missing => {
-                println!("  {} {} is not installed", "✗".red(), dep_name);
-
-                if let Some(instructions) = &check.install_instructions {
-                    let required_version = match &check.dependency {
-                        Dependency::NodeJs { min_version } => min_version.clone(),
-                        Dependency::Python { min_version } => min_version.clone(),
-                        _ => None,
-                    };
-                    return Err(McpError::missing_dependency(
-                        dep_name,
-                        required_version,
-                        instructions.clone(),
-                    ));
-                }
-                Err(McpError::Other(anyhow::anyhow!(
-                    "Required dependency {} is not installed",
-                    dep_name
-                )))
-            }
+            DependencyStatus::Missing => Self::handle_missing_dependency(dep_name, &check),
             DependencyStatus::VersionMismatch {
                 installed,
                 required,

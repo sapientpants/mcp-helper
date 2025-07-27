@@ -123,6 +123,20 @@ impl McpError {
     }
 }
 
+// Helper functions to reduce complexity
+fn write_error_header(f: &mut fmt::Formatter<'_>, message: &str, subject: &str) -> fmt::Result {
+    writeln!(f, "{} {}: {}", "✗".red().bold(), message, subject.yellow())
+}
+
+fn write_detail(f: &mut fmt::Formatter<'_>, label: &str, value: &str) -> fmt::Result {
+    writeln!(f, "  {} {}: {}", "→".blue(), label, value)
+}
+
+fn write_section_header(f: &mut fmt::Formatter<'_>, title: &str) -> fmt::Result {
+    writeln!(f)?;
+    writeln!(f, "{}", title.green().bold())
+}
+
 impl fmt::Display for McpError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -131,17 +145,11 @@ impl fmt::Display for McpError {
                 required_version,
                 install_instructions,
             } => {
-                writeln!(
-                    f,
-                    "{} Missing dependency: {}",
-                    "✗".red().bold(),
-                    dependency.yellow()
-                )?;
+                write_error_header(f, "Missing dependency", dependency)?;
                 if let Some(version) = required_version {
-                    writeln!(f, "  {} Required version: {}", "→".blue(), version)?;
+                    write_detail(f, "Required version", version)?;
                 }
-                writeln!(f)?;
-                writeln!(f, "{}", "How to install:".green().bold())?;
+                write_section_header(f, "How to install:")?;
                 format_install_instructions(f, install_instructions)?;
                 Ok(())
             }
@@ -151,26 +159,10 @@ impl fmt::Display for McpError {
                 required_version,
                 upgrade_instructions,
             } => {
-                writeln!(
-                    f,
-                    "{} Version mismatch for: {}",
-                    "✗".red().bold(),
-                    dependency.yellow()
-                )?;
-                writeln!(
-                    f,
-                    "  {} Current version: {}",
-                    "→".blue(),
-                    current_version.red()
-                )?;
-                writeln!(
-                    f,
-                    "  {} Required version: {}",
-                    "→".blue(),
-                    required_version.green()
-                )?;
-                writeln!(f)?;
-                writeln!(f, "{}", "How to upgrade:".green().bold())?;
+                write_error_header(f, "Version mismatch for", dependency)?;
+                write_detail(f, "Current version", current_version)?;
+                write_detail(f, "Required version", required_version)?;
+                write_section_header(f, "How to upgrade:")?;
                 format_install_instructions(f, upgrade_instructions)?;
                 Ok(())
             }
@@ -179,12 +171,7 @@ impl fmt::Display for McpError {
                 missing_fields,
                 field_descriptions,
             } => {
-                writeln!(
-                    f,
-                    "{} Configuration required for: {}",
-                    "✗".red().bold(),
-                    server_name.yellow()
-                )?;
+                write_error_header(f, "Configuration required for", server_name)?;
                 writeln!(f)?;
                 writeln!(f, "{}", "Missing fields:".red())?;
                 for field in missing_fields {
