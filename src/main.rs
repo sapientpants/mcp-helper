@@ -1,4 +1,3 @@
-use anyhow::Result;
 use clap::{Parser, Subcommand};
 use colored::*;
 use std::env;
@@ -9,6 +8,7 @@ mod runner;
 use runner::Platform;
 
 // Import from mcp_helper lib
+use mcp_helper::error::McpError;
 use mcp_helper::install::InstallCommand;
 
 #[derive(Parser)]
@@ -73,54 +73,71 @@ enum ConfigAction {
     },
 }
 
-fn main() -> Result<()> {
+fn main() {
     let cli = Cli::parse();
 
     if cli.verbose {
         eprintln!("{}", "Verbose mode enabled".dimmed());
     }
 
-    match cli.command {
-        Commands::Run { server, args } => {
-            run_server(&server, &args, cli.verbose)?;
-        }
+    let result = match cli.command {
+        Commands::Run { server, args } => run_server(&server, &args, cli.verbose),
         Commands::Install { server } => {
             println!("{} Installing MCP server: {}", "→".green(), server.cyan());
             let install = InstallCommand::new(cli.verbose);
-            install.execute(&server)?;
+            install.execute(&server).map_err(|e| match e {
+                McpError::Other(err) => err,
+                _ => anyhow::anyhow!("{}", e),
+            })
         }
         Commands::Setup => {
             println!("{}", "🔧 Running MCP Helper setup...".blue().bold());
             println!("{}", "Setup command not yet implemented".yellow());
+            Ok(())
         }
-        Commands::Config { action } => match action {
-            ConfigAction::Add { server } => {
-                println!("{} Adding server to config: {}", "→".green(), server.cyan());
-                println!("{}", "Config add command not yet implemented".yellow());
+        Commands::Config { action } => {
+            match action {
+                ConfigAction::Add { server } => {
+                    println!("{} Adding server to config: {}", "→".green(), server.cyan());
+                    println!("{}", "Config add command not yet implemented".yellow());
+                }
+                ConfigAction::List => {
+                    println!("{}", "📋 Configured MCP servers:".blue().bold());
+                    println!("{}", "Config list command not yet implemented".yellow());
+                }
+                ConfigAction::Remove { server } => {
+                    println!(
+                        "{} Removing server from config: {}",
+                        "→".green(),
+                        server.cyan()
+                    );
+                    println!("{}", "Config remove command not yet implemented".yellow());
+                }
             }
-            ConfigAction::List => {
-                println!("{}", "📋 Configured MCP servers:".blue().bold());
-                println!("{}", "Config list command not yet implemented".yellow());
-            }
-            ConfigAction::Remove { server } => {
-                println!(
-                    "{} Removing server from config: {}",
-                    "→".green(),
-                    server.cyan()
-                );
-                println!("{}", "Config remove command not yet implemented".yellow());
-            }
-        },
+            Ok(())
+        }
         Commands::Doctor => {
             println!("{}", "🏥 Running MCP diagnostics...".blue().bold());
             println!("{}", "Doctor command not yet implemented".yellow());
+            Ok(())
         }
-    }
+    };
 
-    Ok(())
+    if let Err(e) = result {
+        eprintln!();
+        match e.downcast::<McpError>() {
+            Ok(mcp_err) => {
+                eprintln!("{mcp_err}");
+            }
+            Err(err) => {
+                eprintln!("{} {}", "✗".red().bold(), err);
+            }
+        }
+        std::process::exit(1);
+    }
 }
 
-fn run_server(server: &str, args: &[String], verbose: bool) -> Result<()> {
+fn run_server(server: &str, args: &[String], verbose: bool) -> anyhow::Result<()> {
     println!(
         "{} Running MCP server: {}",
         "🚀".green(),

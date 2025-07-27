@@ -1,10 +1,10 @@
-use anyhow::{anyhow, Context, Result};
 use colored::*;
 use dialoguer::{Confirm, Input};
 use std::collections::HashMap;
 
 use crate::client::{detect_clients, ClientRegistry, ServerConfig};
 use crate::deps::{Dependency, DependencyStatus};
+use crate::error::{McpError, Result};
 use crate::server::{detect_server_type, ConfigFieldType, McpServer, ServerType};
 
 pub struct InstallCommand {
@@ -45,7 +45,9 @@ impl InstallCommand {
         let clients = self.select_clients()?;
 
         if clients.is_empty() {
-            return Err(anyhow!("No MCP clients selected for installation"));
+            return Err(McpError::Other(anyhow::anyhow!(
+                "No MCP clients selected for installation"
+            )));
         }
 
         // Prompt for configuration
@@ -75,9 +77,9 @@ impl InstallCommand {
                     version.clone(),
                 )))
             }
-            _ => Err(anyhow!(
-                "Server type {:?} is not yet supported. Only NPM servers are currently implemented.",
-                server_type
+            _ => Err(McpError::server_error(
+                format!("{server_type:?}"),
+                "This server type is not yet supported. Only NPM servers are currently implemented."
             )),
         }
     }
@@ -111,8 +113,23 @@ impl InstallCommand {
             }
             DependencyStatus::Missing => {
                 println!("  {} {} is not installed", "✗".red(), dep_name);
-                self.show_install_instructions(&check)?;
-                Err(anyhow!("Required dependency {} is not installed", dep_name))
+
+                if let Some(instructions) = &check.install_instructions {
+                    let required_version = match &check.dependency {
+                        Dependency::NodeJs { min_version } => min_version.clone(),
+                        Dependency::Python { min_version } => min_version.clone(),
+                        _ => None,
+                    };
+                    return Err(McpError::missing_dependency(
+                        dep_name,
+                        required_version,
+                        instructions.clone(),
+                    ));
+                }
+                Err(McpError::Other(anyhow::anyhow!(
+                    "Required dependency {} is not installed",
+                    dep_name
+                )))
             }
             DependencyStatus::VersionMismatch {
                 installed,
@@ -125,32 +142,21 @@ impl InstallCommand {
                     installed,
                     required
                 );
-                self.show_install_instructions(&check)?;
-                Err(anyhow!("Dependency {} version mismatch", dep_name))
-            }
-        }
-    }
 
-    fn show_install_instructions(&self, check: &crate::deps::DependencyCheck) -> Result<()> {
-        if let Some(instructions) = &check.install_instructions {
-            println!("\n{}", "To install this dependency:".yellow());
-
-            #[cfg(target_os = "windows")]
-            let methods = &instructions.windows;
-            #[cfg(target_os = "macos")]
-            let methods = &instructions.macos;
-            #[cfg(target_os = "linux")]
-            let methods = &instructions.linux;
-
-            for method in methods {
-                println!("  Using {}:", method.name.yellow());
-                println!("    {}", method.command.bright_white());
-                if let Some(desc) = &method.description {
-                    println!("    {}: {}", "Note".yellow(), desc);
+                if let Some(instructions) = &check.install_instructions {
+                    return Err(McpError::version_mismatch(
+                        dep_name,
+                        installed,
+                        required,
+                        instructions.clone(),
+                    ));
                 }
+                Err(McpError::Other(anyhow::anyhow!(
+                    "Dependency {} version mismatch",
+                    dep_name
+                )))
             }
         }
-        Ok(())
     }
 
     fn select_clients(&self) -> Result<Vec<String>> {
@@ -261,9 +267,13 @@ impl InstallCommand {
                         continue;
                     }
 
-                    let _: f64 = input
-                        .parse()
-                        .context(format!("Invalid number for {}", field.name))?;
+                    let _: f64 = input.parse().map_err(|_| {
+                        McpError::configuration_required(
+                            &server.metadata().name,
+                            vec![field.name.clone()],
+                            vec![(field.name.clone(), "Must be a valid number".to_string())],
+                        )
+                    })?;
                     input
                 }
                 ConfigFieldType::Boolean => {
@@ -300,7 +310,19 @@ impl InstallCommand {
         let client = self
             .client_registry
             .get_by_name(client_name)
-            .ok_or_else(|| anyhow!("Client {} not found", client_name))?;
+            .ok_or_else(|| {
+                let available_clients = self
+                    .client_registry
+                    .detect_installed()
+                    .into_iter()
+                    .map(|c| c.name().to_string())
+                    .collect();
+                McpError::client_not_found(
+                    client_name,
+                    available_clients,
+                    "Please check the client name and try again",
+                )
+            })?;
 
         println!("{} Installing to {}...", "→".green(), client_name.cyan());
 
