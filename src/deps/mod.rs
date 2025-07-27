@@ -98,203 +98,82 @@ impl InstallInstructions {
     }
 }
 
+// Helper macro to reduce duplication when creating InstallMethod instances
+macro_rules! method {
+    ($name:expr, $cmd:expr, $desc:expr) => {
+        InstallMethod {
+            name: $name.to_string(),
+            command: $cmd.to_string(),
+            description: Some($desc.to_string()),
+        }
+    };
+}
+
 pub fn get_install_instructions(dependency: &Dependency) -> InstallInstructions {
     match dependency {
         Dependency::NodeJs { .. } => InstallInstructions {
             windows: vec![
-                InstallMethod {
-                    name: "winget".to_string(),
-                    command: "winget install OpenJS.NodeJS".to_string(),
-                    description: Some("Windows Package Manager (recommended)".to_string()),
-                },
-                InstallMethod {
-                    name: "chocolatey".to_string(),
-                    command: "choco install nodejs".to_string(),
-                    description: Some("Chocolatey package manager".to_string()),
-                },
-                InstallMethod {
-                    name: "download".to_string(),
-                    command: "https://nodejs.org/en/download/".to_string(),
-                    description: Some("Direct download from nodejs.org".to_string()),
-                },
+                method!("winget", "winget install OpenJS.NodeJS", "Windows Package Manager (recommended)"),
+                method!("chocolatey", "choco install nodejs", "Chocolatey package manager"),
+                method!("download", "https://nodejs.org/en/download/", "Direct download from nodejs.org"),
             ],
             macos: vec![
-                InstallMethod {
-                    name: "homebrew".to_string(),
-                    command: "brew install node".to_string(),
-                    description: Some("Homebrew package manager (recommended)".to_string()),
-                },
-                InstallMethod {
-                    name: "macports".to_string(),
-                    command: "sudo port install nodejs20".to_string(),
-                    description: Some("MacPorts package manager".to_string()),
-                },
-                InstallMethod {
-                    name: "download".to_string(),
-                    command: "https://nodejs.org/en/download/".to_string(),
-                    description: Some("Direct download from nodejs.org".to_string()),
-                },
+                method!("homebrew", "brew install node", "Homebrew package manager (recommended)"),
+                method!("macports", "sudo port install nodejs20", "MacPorts package manager"),
+                method!("download", "https://nodejs.org/en/download/", "Direct download from nodejs.org"),
             ],
             linux: vec![
-                InstallMethod {
-                    name: "apt".to_string(),
-                    command: "sudo apt update && sudo apt install nodejs npm".to_string(),
-                    description: Some("Debian/Ubuntu (recommended)".to_string()),
-                },
-                InstallMethod {
-                    name: "dnf".to_string(),
-                    command: "sudo dnf install nodejs npm".to_string(),
-                    description: Some("Fedora/RHEL".to_string()),
-                },
-                InstallMethod {
-                    name: "snap".to_string(),
-                    command: "sudo snap install node --classic".to_string(),
-                    description: Some("Snap package".to_string()),
-                },
-                InstallMethod {
-                    name: "nvm".to_string(),
-                    command: "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash".to_string(),
-                    description: Some("Node Version Manager".to_string()),
-                },
+                method!("apt", "sudo apt update && sudo apt install nodejs npm", "Debian/Ubuntu (recommended)"),
+                method!("dnf", "sudo dnf install nodejs npm", "Fedora/RHEL"),
+                method!("snap", "sudo snap install node --classic", "Snap package"),
+                method!("nvm", "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash", "Node Version Manager"),
             ],
         },
         Dependency::Python { .. } => InstallInstructions {
             windows: vec![
-                InstallMethod {
-                    name: "winget".to_string(),
-                    command: "winget install Python.Python.3.12".to_string(),
-                    description: Some("Windows Package Manager (recommended)".to_string()),
-                },
-                InstallMethod {
-                    name: "chocolatey".to_string(),
-                    command: "choco install python".to_string(),
-                    description: Some("Chocolatey package manager".to_string()),
-                },
-                InstallMethod {
-                    name: "download".to_string(),
-                    command: "https://www.python.org/downloads/".to_string(),
-                    description: Some("Direct download from python.org".to_string()),
-                },
+                method!("winget", "winget install Python.Python.3.12", "Windows Package Manager (recommended)"),
+                method!("chocolatey", "choco install python", "Chocolatey package manager"),
+                method!("download", "https://www.python.org/downloads/", "Direct download from python.org"),
             ],
             macos: vec![
-                InstallMethod {
-                    name: "homebrew".to_string(),
-                    command: "brew install python@3.12".to_string(),
-                    description: Some("Homebrew package manager (recommended)".to_string()),
-                },
-                InstallMethod {
-                    name: "pyenv".to_string(),
-                    command: "pyenv install 3.12.0".to_string(),
-                    description: Some("Python version manager".to_string()),
-                },
-                InstallMethod {
-                    name: "download".to_string(),
-                    command: "https://www.python.org/downloads/".to_string(),
-                    description: Some("Direct download from python.org".to_string()),
-                },
+                method!("homebrew", "brew install python@3.12", "Homebrew package manager (recommended)"),
+                method!("pyenv", "pyenv install 3.12.0", "Python version manager"),
+                method!("download", "https://www.python.org/downloads/", "Direct download from python.org"),
             ],
             linux: vec![
-                InstallMethod {
-                    name: "apt".to_string(),
-                    command: "sudo apt update && sudo apt install python3 python3-pip".to_string(),
-                    description: Some("Debian/Ubuntu (recommended)".to_string()),
-                },
-                InstallMethod {
-                    name: "dnf".to_string(),
-                    command: "sudo dnf install python3 python3-pip".to_string(),
-                    description: Some("Fedora/RHEL".to_string()),
-                },
-                InstallMethod {
-                    name: "pyenv".to_string(),
-                    command: "curl https://pyenv.run | bash".to_string(),
-                    description: Some("Python version manager".to_string()),
-                },
+                method!("apt", "sudo apt update && sudo apt install python3 python3-pip", "Debian/Ubuntu (recommended)"),
+                method!("dnf", "sudo dnf install python3 python3-pip", "Fedora/RHEL"),
+                method!("pyenv", "curl https://pyenv.run | bash", "Python version manager"),
             ],
         },
         Dependency::Docker => InstallInstructions {
             windows: vec![
-                InstallMethod {
-                    name: "docker-desktop".to_string(),
-                    command: "https://www.docker.com/products/docker-desktop/".to_string(),
-                    description: Some("Docker Desktop for Windows (recommended)".to_string()),
-                },
-                InstallMethod {
-                    name: "winget".to_string(),
-                    command: "winget install Docker.DockerDesktop".to_string(),
-                    description: Some("Install via Windows Package Manager".to_string()),
-                },
+                method!("docker-desktop", "https://www.docker.com/products/docker-desktop/", "Docker Desktop for Windows (recommended)"),
+                method!("winget", "winget install Docker.DockerDesktop", "Install via Windows Package Manager"),
             ],
             macos: vec![
-                InstallMethod {
-                    name: "docker-desktop".to_string(),
-                    command: "https://www.docker.com/products/docker-desktop/".to_string(),
-                    description: Some("Docker Desktop for Mac (recommended)".to_string()),
-                },
-                InstallMethod {
-                    name: "homebrew".to_string(),
-                    command: "brew install --cask docker".to_string(),
-                    description: Some("Install via Homebrew".to_string()),
-                },
+                method!("docker-desktop", "https://www.docker.com/products/docker-desktop/", "Docker Desktop for Mac (recommended)"),
+                method!("homebrew", "brew install --cask docker", "Install via Homebrew"),
             ],
             linux: vec![
-                InstallMethod {
-                    name: "docker-ce".to_string(),
-                    command: "https://docs.docker.com/engine/install/".to_string(),
-                    description: Some("Docker Community Edition (recommended)".to_string()),
-                },
-                InstallMethod {
-                    name: "snap".to_string(),
-                    command: "sudo snap install docker".to_string(),
-                    description: Some("Install via Snap".to_string()),
-                },
+                method!("docker-ce", "https://docs.docker.com/engine/install/", "Docker Community Edition (recommended)"),
+                method!("snap", "sudo snap install docker", "Install via Snap"),
             ],
         },
         Dependency::Git => InstallInstructions {
             windows: vec![
-                InstallMethod {
-                    name: "winget".to_string(),
-                    command: "winget install Git.Git".to_string(),
-                    description: Some("Windows Package Manager (recommended)".to_string()),
-                },
-                InstallMethod {
-                    name: "chocolatey".to_string(),
-                    command: "choco install git".to_string(),
-                    description: Some("Chocolatey package manager".to_string()),
-                },
-                InstallMethod {
-                    name: "download".to_string(),
-                    command: "https://git-scm.com/download/win".to_string(),
-                    description: Some("Direct download from git-scm.com".to_string()),
-                },
+                method!("winget", "winget install Git.Git", "Windows Package Manager (recommended)"),
+                method!("chocolatey", "choco install git", "Chocolatey package manager"),
+                method!("download", "https://git-scm.com/download/win", "Direct download from git-scm.com"),
             ],
             macos: vec![
-                InstallMethod {
-                    name: "xcode".to_string(),
-                    command: "xcode-select --install".to_string(),
-                    description: Some("Xcode Command Line Tools (includes Git)".to_string()),
-                },
-                InstallMethod {
-                    name: "homebrew".to_string(),
-                    command: "brew install git".to_string(),
-                    description: Some("Homebrew package manager".to_string()),
-                },
+                method!("xcode", "xcode-select --install", "Xcode Command Line Tools (includes Git)"),
+                method!("homebrew", "brew install git", "Homebrew package manager"),
             ],
             linux: vec![
-                InstallMethod {
-                    name: "apt".to_string(),
-                    command: "sudo apt update && sudo apt install git".to_string(),
-                    description: Some("Debian/Ubuntu".to_string()),
-                },
-                InstallMethod {
-                    name: "dnf".to_string(),
-                    command: "sudo dnf install git".to_string(),
-                    description: Some("Fedora/RHEL".to_string()),
-                },
-                InstallMethod {
-                    name: "pacman".to_string(),
-                    command: "sudo pacman -S git".to_string(),
-                    description: Some("Arch Linux".to_string()),
-                },
+                method!("apt", "sudo apt update && sudo apt install git", "Debian/Ubuntu"),
+                method!("dnf", "sudo dnf install git", "Fedora/RHEL"),
+                method!("pacman", "sudo pacman -S git", "Arch Linux"),
             ],
         },
     }
