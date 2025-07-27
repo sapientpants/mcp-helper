@@ -1,6 +1,10 @@
 use mcp_helper::deps::InstallInstructions;
 use mcp_helper::error::{McpError, Result};
 
+#[path = "common/mod.rs"]
+mod common;
+use common::assert_error_contains;
+
 #[test]
 fn test_missing_dependency_error_display() {
     let instructions = InstallInstructions {
@@ -17,13 +21,17 @@ fn test_missing_dependency_error_display() {
     let error_string = format!("{error}");
 
     // Check that the error contains expected content
-    assert!(error_string.contains("Missing dependency: Node.js"));
-    assert!(error_string.contains("Required version: v20.0.0"));
-    assert!(error_string.contains("How to install:"));
+    assert_error_contains(
+        &error_string,
+        &[
+            "Missing dependency: Node.js",
+            "Required version: v20.0.0",
+            "How to install:",
+        ],
+    );
     #[cfg(target_os = "macos")]
     {
-        assert!(error_string.contains("Homebrew"));
-        assert!(error_string.contains("brew install node"));
+        assert_error_contains(&error_string, &["Homebrew", "brew install node"]);
     }
 }
 
@@ -42,10 +50,15 @@ fn test_version_mismatch_error_display() {
     let error = McpError::version_mismatch("Node.js", "v18.0.0", "v20.0.0", instructions);
     let error_string = format!("{error}");
 
-    assert!(error_string.contains("Version mismatch for: Node.js"));
-    assert!(error_string.contains("Current version: v18.0.0"));
-    assert!(error_string.contains("Required version: v20.0.0"));
-    assert!(error_string.contains("How to upgrade:"));
+    assert_error_contains(
+        &error_string,
+        &[
+            "Version mismatch for: Node.js",
+            "Current version: v18.0.0",
+            "Required version: v20.0.0",
+            "How to upgrade:",
+        ],
+    );
 }
 
 #[test]
@@ -63,12 +76,17 @@ fn test_configuration_required_error_display() {
     );
     let error_string = format!("{error}");
 
-    assert!(error_string.contains("Configuration required for: slack-server"));
-    assert!(error_string.contains("Missing fields:"));
-    assert!(error_string.contains("api_token"));
-    assert!(error_string.contains("workspace_id"));
-    assert!(error_string.contains("Field descriptions:"));
-    assert!(error_string.contains("Your Slack API token"));
+    assert_error_contains(
+        &error_string,
+        &[
+            "Configuration required for: slack-server",
+            "Missing fields:",
+            "api_token",
+            "workspace_id",
+            "Field descriptions:",
+            "Your Slack API token",
+        ],
+    );
 }
 
 #[test]
@@ -80,12 +98,17 @@ fn test_client_not_found_error_display() {
     );
     let error_string = format!("{error}");
 
-    assert!(error_string.contains("MCP client not found: Unknown Client"));
-    assert!(error_string.contains("Available clients:"));
-    assert!(error_string.contains("Claude Desktop"));
-    assert!(error_string.contains("Cursor"));
-    assert!(error_string.contains("Installation guidance:"));
-    assert!(error_string.contains("Visit https://claude.ai"));
+    assert_error_contains(
+        &error_string,
+        &[
+            "MCP client not found: Unknown Client",
+            "Available clients:",
+            "Claude Desktop",
+            "Cursor",
+            "Installation guidance:",
+            "Visit https://claude.ai",
+        ],
+    );
 }
 
 #[test]
@@ -96,9 +119,14 @@ fn test_config_error_display() {
     );
     let error_string = format!("{error}");
 
-    assert!(error_string.contains("Configuration error"));
-    assert!(error_string.contains("Path: /path/to/config.json"));
-    assert!(error_string.contains("Error: Invalid JSON"));
+    assert_error_contains(
+        &error_string,
+        &[
+            "Configuration error",
+            "Path: /path/to/config.json",
+            "Error: Invalid JSON",
+        ],
+    );
 }
 
 #[test]
@@ -109,8 +137,13 @@ fn test_server_error_display() {
     );
     let error_string = format!("{error}");
 
-    assert!(error_string.contains("Server error: filesystem-server"));
-    assert!(error_string.contains("Failed to start server: permission denied"));
+    assert_error_contains(
+        &error_string,
+        &[
+            "Server error: filesystem-server",
+            "Failed to start server: permission denied",
+        ],
+    );
 }
 
 #[test]
@@ -125,9 +158,14 @@ fn test_io_error_display() {
     );
     let error_string = format!("{error}");
 
-    assert!(error_string.contains("I/O error during: reading config"));
-    assert!(error_string.contains("Path: /path/to/file"));
-    assert!(error_string.contains("file not found"));
+    assert_error_contains(
+        &error_string,
+        &[
+            "I/O error during: reading config",
+            "Path: /path/to/file",
+            "file not found",
+        ],
+    );
 }
 
 #[test]

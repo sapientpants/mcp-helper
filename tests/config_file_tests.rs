@@ -2,24 +2,20 @@ use serde_json::{json, Value};
 use std::fs;
 use tempfile::TempDir;
 
+#[path = "common/mod.rs"]
+mod common;
+use common::*;
+
 #[test]
 fn test_read_empty_config() {
-    let temp_dir = TempDir::new().unwrap();
-    let config_path = temp_dir.path().join("claude_desktop_config.json");
-
-    // Write empty JSON object
-    fs::write(&config_path, "{}").unwrap();
-
-    let content = fs::read_to_string(&config_path).unwrap();
-    let parsed: Value = serde_json::from_str(&content).unwrap();
-
+    let (_temp_dir, config_path) = setup_empty_config();
+    let parsed = read_json_file(&config_path);
     assert_eq!(parsed, json!({}));
 }
 
 #[test]
 fn test_read_config_with_mcp_servers() {
-    let temp_dir = TempDir::new().unwrap();
-    let config_path = temp_dir.path().join("claude_desktop_config.json");
+    let (_temp_dir, config_path) = setup_test_config("");
 
     let config_content = json!({
         "mcpServers": {

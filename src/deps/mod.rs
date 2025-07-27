@@ -29,7 +29,7 @@ pub enum DependencyStatus {
     VersionMismatch { installed: String, required: String },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct InstallInstructions {
     pub windows: Vec<InstallMethod>,
     pub macos: Vec<InstallMethod>,

@@ -3,6 +3,9 @@ use std::fmt;
 
 use crate::deps::InstallInstructions;
 
+pub mod builder;
+pub use builder::ErrorBuilder;
+
 #[derive(Debug)]
 pub enum McpError {
     MissingDependency {
