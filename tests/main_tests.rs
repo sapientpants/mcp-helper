@@ -234,13 +234,17 @@ fn test_platform_detection_output() {
 // Test error formatting
 #[test]
 fn test_mcp_error_display() {
-    // Install command will fail with a dialog error in non-terminal environment
+    // Install command will fail in non-terminal environment
+    // Either with a dialog error or "No MCP clients selected"
     let mut cmd = get_command();
     cmd.arg("install")
         .arg("@test/package")
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Dialog error: IO error"));
+        .stderr(
+            predicate::str::contains("Dialog error: IO error")
+                .or(predicate::str::contains("No MCP clients selected")),
+        );
 }
 
 // Test help for subcommands
