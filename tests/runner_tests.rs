@@ -100,11 +100,23 @@ fn test_run_error_messages() {
     let test_cases = vec![
         (
             "nonexistent-server-12345",
-            vec!["exited with status", "not installed", "Not Found"],
+            vec![
+                "exited with status",
+                "not installed",
+                "Not Found",
+                "program not found",
+                "not in PATH",
+            ],
         ),
         (
             "definitely-not-real-xyz",
-            vec!["not found", "Not Found", "not installed"],
+            vec![
+                "not found",
+                "Not Found",
+                "not installed",
+                "program not found",
+                "not in PATH",
+            ],
         ),
     ];
 
