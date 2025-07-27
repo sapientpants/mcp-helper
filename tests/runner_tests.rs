@@ -285,7 +285,7 @@ fn test_windows_specific_behavior() {
     // Windows-specific test for npx.cmd handling
     let result = runner.get_windows_command(&PathBuf::from("test-server"), &[]);
 
-    if let Ok((cmd, args)) = result {
+    if let Ok((cmd, _args)) = result {
         // On Windows CI without npx, this might return different results
         assert!(cmd == "cmd.exe" || cmd == "npx");
     }
