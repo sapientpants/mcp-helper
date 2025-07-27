@@ -84,7 +84,7 @@ impl InstallCommand {
         }
     }
 
-    fn get_dependency_name(dependency: &Dependency) -> &'static str {
+    pub fn get_dependency_name(dependency: &Dependency) -> &'static str {
         match dependency {
             Dependency::NodeJs { .. } => "Node.js",
             Dependency::Python { .. } => "Python",
@@ -93,7 +93,7 @@ impl InstallCommand {
         }
     }
 
-    fn handle_installed_dependency(dep_name: &str, version: &Option<String>) -> Result<()> {
+    pub fn handle_installed_dependency(dep_name: &str, version: &Option<String>) -> Result<()> {
         println!(
             "  {} {} is installed{}",
             "✓".green(),
@@ -107,7 +107,7 @@ impl InstallCommand {
         Ok(())
     }
 
-    fn handle_missing_dependency(
+    pub fn handle_missing_dependency(
         dep_name: &str,
         check: &crate::deps::DependencyCheck,
     ) -> Result<()> {
@@ -214,7 +214,7 @@ impl InstallCommand {
         }
     }
 
-    fn build_field_prompt(field: &ConfigField, is_required: bool) -> String {
+    pub fn build_field_prompt(field: &ConfigField, is_required: bool) -> String {
         match (&field.description, is_required) {
             (Some(desc), true) => desc.clone(),
             (Some(desc), false) => format!("{desc} (optional)"),

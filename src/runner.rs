@@ -93,7 +93,7 @@ impl ServerRunner {
         Ok(())
     }
 
-    fn resolve_server_path(&self, server: &str) -> Result<PathBuf> {
+    pub fn resolve_server_path(&self, server: &str) -> Result<PathBuf> {
         // Normalize the path for the current platform
         let normalized_server = normalize_path(server, self.platform);
 
@@ -112,7 +112,7 @@ impl ServerRunner {
         }
     }
 
-    fn get_command_for_platform(
+    pub fn get_command_for_platform(
         &self,
         server_path: &Path,
         args: &[String],
@@ -129,7 +129,7 @@ impl ServerRunner {
         }
     }
 
-    fn get_windows_command(
+    pub fn get_windows_command(
         &self,
         server_path: &Path,
         args: &[String],
@@ -179,7 +179,7 @@ impl ServerRunner {
         Ok(("node".to_string(), cmd_args))
     }
 
-    fn get_unix_command(
+    pub fn get_unix_command(
         &self,
         server_path: &Path,
         args: &[String],

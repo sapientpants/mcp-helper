@@ -9,7 +9,7 @@ name = "mcp_helper"
 path = "src/lib.rs"
 
 [[bin]]
-name = "mcp-helper"
+name = "mcp"
 path = "src/main.rs"
 
 [dependencies]
@@ -26,3 +26,5 @@ dialoguer = "0.11"
 
 [dev-dependencies]
 rusty-hook = "^0.11"
+assert_cmd = "2.0"
+predicates = "3.0"
