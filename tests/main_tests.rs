@@ -215,7 +215,7 @@ fn test_config_missing_action() {
     cmd.arg("config")
         .assert()
         .code(2) // Exit code 2 indicates missing subcommand
-        .stderr(predicate::str::contains("Usage: mcp config"));
+        .stderr(predicate::str::contains("config [OPTIONS] <COMMAND>"));
 }
 
 // Test platform detection through environment variable manipulation
