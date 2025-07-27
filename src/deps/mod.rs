@@ -98,83 +98,218 @@ impl InstallInstructions {
     }
 }
 
-// Helper macro to reduce duplication when creating InstallMethod instances
-macro_rules! method {
-    ($name:expr, $cmd:expr, $desc:expr) => {
-        InstallMethod {
-            name: $name.to_string(),
-            command: $cmd.to_string(),
-            description: Some($desc.to_string()),
+impl InstallMethod {
+    fn new(name: &str, command: &str, description: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            command: command.to_string(),
+            description: Some(description.to_string()),
         }
-    };
+    }
 }
+
+struct InstallConfig {
+    windows: &'static [(&'static str, &'static str, &'static str)],
+    macos: &'static [(&'static str, &'static str, &'static str)],
+    linux: &'static [(&'static str, &'static str, &'static str)],
+}
+
+impl InstallConfig {
+    fn to_instructions(&self) -> InstallInstructions {
+        InstallInstructions {
+            windows: self
+                .windows
+                .iter()
+                .map(|(name, cmd, desc)| InstallMethod::new(name, cmd, desc))
+                .collect(),
+            macos: self
+                .macos
+                .iter()
+                .map(|(name, cmd, desc)| InstallMethod::new(name, cmd, desc))
+                .collect(),
+            linux: self
+                .linux
+                .iter()
+                .map(|(name, cmd, desc)| InstallMethod::new(name, cmd, desc))
+                .collect(),
+        }
+    }
+}
+
+const NODEJS_CONFIG: InstallConfig = InstallConfig {
+    windows: &[
+        (
+            "winget",
+            "winget install OpenJS.NodeJS",
+            "Windows Package Manager (recommended)",
+        ),
+        (
+            "chocolatey",
+            "choco install nodejs",
+            "Chocolatey package manager",
+        ),
+        (
+            "download",
+            "https://nodejs.org/en/download/",
+            "Direct download from nodejs.org",
+        ),
+    ],
+    macos: &[
+        (
+            "homebrew",
+            "brew install node",
+            "Homebrew package manager (recommended)",
+        ),
+        (
+            "macports",
+            "sudo port install nodejs20",
+            "MacPorts package manager",
+        ),
+        (
+            "download",
+            "https://nodejs.org/en/download/",
+            "Direct download from nodejs.org",
+        ),
+    ],
+    linux: &[
+        (
+            "apt",
+            "sudo apt update && sudo apt install nodejs npm",
+            "Debian/Ubuntu (recommended)",
+        ),
+        ("dnf", "sudo dnf install nodejs npm", "Fedora/RHEL"),
+        ("snap", "sudo snap install node --classic", "Snap package"),
+        (
+            "nvm",
+            "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash",
+            "Node Version Manager",
+        ),
+    ],
+};
+
+const PYTHON_CONFIG: InstallConfig = InstallConfig {
+    windows: &[
+        (
+            "winget",
+            "winget install Python.Python.3.12",
+            "Windows Package Manager (recommended)",
+        ),
+        (
+            "chocolatey",
+            "choco install python",
+            "Chocolatey package manager",
+        ),
+        (
+            "download",
+            "https://www.python.org/downloads/",
+            "Direct download from python.org",
+        ),
+    ],
+    macos: &[
+        (
+            "homebrew",
+            "brew install python@3.12",
+            "Homebrew package manager (recommended)",
+        ),
+        ("pyenv", "pyenv install 3.12.0", "Python version manager"),
+        (
+            "download",
+            "https://www.python.org/downloads/",
+            "Direct download from python.org",
+        ),
+    ],
+    linux: &[
+        (
+            "apt",
+            "sudo apt update && sudo apt install python3 python3-pip",
+            "Debian/Ubuntu (recommended)",
+        ),
+        ("dnf", "sudo dnf install python3 python3-pip", "Fedora/RHEL"),
+        (
+            "pyenv",
+            "curl https://pyenv.run | bash",
+            "Python version manager",
+        ),
+    ],
+};
+
+const DOCKER_CONFIG: InstallConfig = InstallConfig {
+    windows: &[
+        (
+            "docker-desktop",
+            "https://www.docker.com/products/docker-desktop/",
+            "Docker Desktop for Windows (recommended)",
+        ),
+        (
+            "winget",
+            "winget install Docker.DockerDesktop",
+            "Install via Windows Package Manager",
+        ),
+    ],
+    macos: &[
+        (
+            "docker-desktop",
+            "https://www.docker.com/products/docker-desktop/",
+            "Docker Desktop for Mac (recommended)",
+        ),
+        (
+            "homebrew",
+            "brew install --cask docker",
+            "Install via Homebrew",
+        ),
+    ],
+    linux: &[
+        (
+            "docker-ce",
+            "https://docs.docker.com/engine/install/",
+            "Docker Community Edition (recommended)",
+        ),
+        ("snap", "sudo snap install docker", "Install via Snap"),
+    ],
+};
+
+const GIT_CONFIG: InstallConfig = InstallConfig {
+    windows: &[
+        (
+            "winget",
+            "winget install Git.Git",
+            "Windows Package Manager (recommended)",
+        ),
+        (
+            "chocolatey",
+            "choco install git",
+            "Chocolatey package manager",
+        ),
+        (
+            "download",
+            "https://git-scm.com/download/win",
+            "Direct download from git-scm.com",
+        ),
+    ],
+    macos: &[
+        (
+            "xcode",
+            "xcode-select --install",
+            "Xcode Command Line Tools (includes Git)",
+        ),
+        ("homebrew", "brew install git", "Homebrew package manager"),
+    ],
+    linux: &[
+        (
+            "apt",
+            "sudo apt update && sudo apt install git",
+            "Debian/Ubuntu",
+        ),
+        ("dnf", "sudo dnf install git", "Fedora/RHEL"),
+        ("pacman", "sudo pacman -S git", "Arch Linux"),
+    ],
+};
 
 pub fn get_install_instructions(dependency: &Dependency) -> InstallInstructions {
     match dependency {
-        Dependency::NodeJs { .. } => InstallInstructions {
-            windows: vec![
-                method!("winget", "winget install OpenJS.NodeJS", "Windows Package Manager (recommended)"),
-                method!("chocolatey", "choco install nodejs", "Chocolatey package manager"),
-                method!("download", "https://nodejs.org/en/download/", "Direct download from nodejs.org"),
-            ],
-            macos: vec![
-                method!("homebrew", "brew install node", "Homebrew package manager (recommended)"),
-                method!("macports", "sudo port install nodejs20", "MacPorts package manager"),
-                method!("download", "https://nodejs.org/en/download/", "Direct download from nodejs.org"),
-            ],
-            linux: vec![
-                method!("apt", "sudo apt update && sudo apt install nodejs npm", "Debian/Ubuntu (recommended)"),
-                method!("dnf", "sudo dnf install nodejs npm", "Fedora/RHEL"),
-                method!("snap", "sudo snap install node --classic", "Snap package"),
-                method!("nvm", "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash", "Node Version Manager"),
-            ],
-        },
-        Dependency::Python { .. } => InstallInstructions {
-            windows: vec![
-                method!("winget", "winget install Python.Python.3.12", "Windows Package Manager (recommended)"),
-                method!("chocolatey", "choco install python", "Chocolatey package manager"),
-                method!("download", "https://www.python.org/downloads/", "Direct download from python.org"),
-            ],
-            macos: vec![
-                method!("homebrew", "brew install python@3.12", "Homebrew package manager (recommended)"),
-                method!("pyenv", "pyenv install 3.12.0", "Python version manager"),
-                method!("download", "https://www.python.org/downloads/", "Direct download from python.org"),
-            ],
-            linux: vec![
-                method!("apt", "sudo apt update && sudo apt install python3 python3-pip", "Debian/Ubuntu (recommended)"),
-                method!("dnf", "sudo dnf install python3 python3-pip", "Fedora/RHEL"),
-                method!("pyenv", "curl https://pyenv.run | bash", "Python version manager"),
-            ],
-        },
-        Dependency::Docker => InstallInstructions {
-            windows: vec![
-                method!("docker-desktop", "https://www.docker.com/products/docker-desktop/", "Docker Desktop for Windows (recommended)"),
-                method!("winget", "winget install Docker.DockerDesktop", "Install via Windows Package Manager"),
-            ],
-            macos: vec![
-                method!("docker-desktop", "https://www.docker.com/products/docker-desktop/", "Docker Desktop for Mac (recommended)"),
-                method!("homebrew", "brew install --cask docker", "Install via Homebrew"),
-            ],
-            linux: vec![
-                method!("docker-ce", "https://docs.docker.com/engine/install/", "Docker Community Edition (recommended)"),
-                method!("snap", "sudo snap install docker", "Install via Snap"),
-            ],
-        },
-        Dependency::Git => InstallInstructions {
-            windows: vec![
-                method!("winget", "winget install Git.Git", "Windows Package Manager (recommended)"),
-                method!("chocolatey", "choco install git", "Chocolatey package manager"),
-                method!("download", "https://git-scm.com/download/win", "Direct download from git-scm.com"),
-            ],
-            macos: vec![
-                method!("xcode", "xcode-select --install", "Xcode Command Line Tools (includes Git)"),
-                method!("homebrew", "brew install git", "Homebrew package manager"),
-            ],
-            linux: vec![
-                method!("apt", "sudo apt update && sudo apt install git", "Debian/Ubuntu"),
-                method!("dnf", "sudo dnf install git", "Fedora/RHEL"),
-                method!("pacman", "sudo pacman -S git", "Arch Linux"),
-            ],
-        },
+        Dependency::NodeJs { .. } => NODEJS_CONFIG.to_instructions(),
+        Dependency::Python { .. } => PYTHON_CONFIG.to_instructions(),
+        Dependency::Docker => DOCKER_CONFIG.to_instructions(),
+        Dependency::Git => GIT_CONFIG.to_instructions(),
     }
 }
