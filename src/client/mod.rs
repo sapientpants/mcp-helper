@@ -1,10 +1,16 @@
 pub mod claude_desktop;
+pub mod cursor;
+pub mod vscode;
+pub mod windsurf;
 
 use anyhow::Result;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 pub use claude_desktop::ClaudeDesktopClient;
+pub use cursor::CursorClient;
+pub use vscode::VSCodeClient;
+pub use windsurf::WindsurfClient;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ServerConfig {
@@ -65,13 +71,11 @@ impl Default for ClientRegistry {
 pub fn detect_clients() -> Vec<Box<dyn McpClient>> {
     let mut registry = ClientRegistry::new();
 
-    // Register Claude Desktop client
+    // Register all available clients
     registry.register(Box::new(ClaudeDesktopClient::new()));
-
-    // TODO: Register other client implementations here
-    // registry.register(Box::new(CursorClient::new()));
-    // registry.register(Box::new(VsCodeClient::new()));
-    // registry.register(Box::new(WindsurfClient::new()));
+    registry.register(Box::new(CursorClient::new()));
+    registry.register(Box::new(VSCodeClient::new()));
+    registry.register(Box::new(WindsurfClient::new()));
 
     registry.clients
 }

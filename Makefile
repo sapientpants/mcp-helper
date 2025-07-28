@@ -152,7 +152,7 @@ ci: clean fmt-check lint build audit coverage-ci
 
 # Quick test - only run fast unit tests
 quick-test:
-	@$(CARGO) test --lib -- --test-threads=4
+	@$(CARGO) test --lib -- --test-threads=1
 
 # Benchmark (requires nightly Rust)
 bench:
