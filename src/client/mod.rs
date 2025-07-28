@@ -1,3 +1,4 @@
+pub mod claude_code;
 pub mod claude_desktop;
 pub mod cursor;
 pub mod vscode;
@@ -7,6 +8,7 @@ use anyhow::Result;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+pub use claude_code::ClaudeCodeClient;
 pub use claude_desktop::ClaudeDesktopClient;
 pub use cursor::CursorClient;
 pub use vscode::VSCodeClient;
@@ -72,6 +74,7 @@ pub fn detect_clients() -> Vec<Box<dyn McpClient>> {
     let mut registry = ClientRegistry::new();
 
     // Register all available clients
+    registry.register(Box::new(ClaudeCodeClient::new()));
     registry.register(Box::new(ClaudeDesktopClient::new()));
     registry.register(Box::new(CursorClient::new()));
     registry.register(Box::new(VSCodeClient::new()));

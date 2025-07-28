@@ -2,8 +2,8 @@
 // to avoid conflicts between parallel test execution.
 
 use mcp_helper::client::{
-    ClaudeDesktopClient, ClientRegistry, CursorClient, McpClient, ServerConfig, VSCodeClient,
-    WindsurfClient,
+    ClaudeCodeClient, ClaudeDesktopClient, ClientRegistry, CursorClient, McpClient, ServerConfig,
+    VSCodeClient, WindsurfClient,
 };
 use std::collections::HashMap;
 use std::env;
@@ -13,9 +13,10 @@ use tempfile::TempDir;
 #[test]
 fn test_all_clients_registered() {
     let clients = mcp_helper::client::detect_clients();
-    assert_eq!(clients.len(), 4);
+    assert_eq!(clients.len(), 5);
 
     let names: Vec<&str> = clients.iter().map(|c| c.name()).collect();
+    assert!(names.contains(&"Claude Code"));
     assert!(names.contains(&"Claude Desktop"));
     assert!(names.contains(&"Cursor"));
     assert!(names.contains(&"VS Code"));
@@ -25,16 +26,20 @@ fn test_all_clients_registered() {
 #[test]
 fn test_client_registry_get_by_name() {
     let mut registry = ClientRegistry::new();
+    registry.register(Box::new(ClaudeCodeClient::new()));
     registry.register(Box::new(CursorClient::new()));
     registry.register(Box::new(VSCodeClient::new()));
     registry.register(Box::new(WindsurfClient::new()));
 
     // Test exact match
+    assert!(registry.get_by_name("Claude Code").is_some());
     assert!(registry.get_by_name("Cursor").is_some());
     assert!(registry.get_by_name("VS Code").is_some());
     assert!(registry.get_by_name("Windsurf").is_some());
 
     // Test case insensitive
+    assert!(registry.get_by_name("claude code").is_some());
+    assert!(registry.get_by_name("CLAUDE CODE").is_some());
     assert!(registry.get_by_name("cursor").is_some());
     assert!(registry.get_by_name("CURSOR").is_some());
     assert!(registry.get_by_name("vs code").is_some());
@@ -273,6 +278,7 @@ fn test_client_with_env_vars() {
 
     // Test all clients handle env vars
     let clients: Vec<Box<dyn McpClient>> = vec![
+        Box::new(ClaudeCodeClient::new()),
         Box::new(CursorClient::new()),
         Box::new(VSCodeClient::new()),
         Box::new(WindsurfClient::new()),
