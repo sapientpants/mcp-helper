@@ -192,4 +192,35 @@ mod tests {
             Platform::Windows | Platform::MacOS | Platform::Linux => {}
         }
     }
+
+    #[test]
+    fn test_print_not_implemented() {
+        // Test that the function runs without panicking
+        print_not_implemented("TestCommand");
+    }
+
+    #[test]
+    fn test_run_server_error_handling() {
+        // Test run_server with invalid server name
+        let result = run_server("nonexistent-server-xyz", &[], false);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_run_server_verbose() {
+        // Test run_server with verbose mode
+        let result = run_server("nonexistent-server-xyz", &["arg1".to_string()], true);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_platform_detection_current_os() {
+        let platform = detect_platform();
+        #[cfg(target_os = "windows")]
+        assert_eq!(platform, Platform::Windows);
+        #[cfg(target_os = "macos")]
+        assert_eq!(platform, Platform::MacOS);
+        #[cfg(target_os = "linux")]
+        assert_eq!(platform, Platform::Linux);
+    }
 }
