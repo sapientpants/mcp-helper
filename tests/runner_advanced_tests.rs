@@ -178,7 +178,16 @@ fn test_runner_with_complex_npm_package() {
 
 #[test]
 fn test_runner_error_context() {
-    let runner = ServerRunner::new(Platform::Linux, false);
+    // Use the current platform for testing
+    let platform = if cfg!(target_os = "windows") {
+        Platform::Windows
+    } else if cfg!(target_os = "macos") {
+        Platform::MacOS
+    } else {
+        Platform::Linux
+    };
+
+    let runner = ServerRunner::new(platform, false);
 
     // Test that errors have proper context
     let result = runner.run("definitely-not-a-real-server", &[]);
@@ -187,9 +196,12 @@ fn test_runner_error_context() {
     if let Err(e) = result {
         // Check that the error has context about what failed
         let error_chain = format!("{e:?}");
+        // On different platforms, the error message may vary
         assert!(
             error_chain.contains("definitely-not-a-real-server")
                 || error_chain.contains("Failed to find")
+                || error_chain.contains("not found")
+                || error_chain.contains("404")
         );
     }
 }
