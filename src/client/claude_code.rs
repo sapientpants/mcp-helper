@@ -169,9 +169,19 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let temp_home = temp_dir.path().to_path_buf();
 
-        // Temporarily override HOME for this test
-        let original_home = env::var("HOME").ok();
-        env::set_var("HOME", &temp_home);
+        // Save original HOME/USERPROFILE for restoration
+        let original_home = if cfg!(windows) {
+            env::var("USERPROFILE").ok()
+        } else {
+            env::var("HOME").ok()
+        };
+
+        // Set appropriate home directory variable
+        if cfg!(windows) {
+            env::set_var("USERPROFILE", &temp_home);
+        } else {
+            env::set_var("HOME", &temp_home);
+        }
 
         let client = ClaudeCodeClient::new();
 
@@ -182,21 +192,36 @@ mod tests {
         };
 
         let result = client.add_server("test-server", config);
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "Failed to add server: {result:?}");
 
         // Verify the config was written correctly
         let config_path = temp_home.join(".claude.json");
-        assert!(config_path.exists());
+        assert!(
+            config_path.exists(),
+            "Config file should exist at {config_path:?}"
+        );
 
         let content = fs::read_to_string(&config_path).unwrap();
         assert!(content.contains("test-server"));
         assert!(content.contains("mcpServers"));
         assert!(content.contains("node"));
 
-        // Restore original HOME
+        // Restore original HOME/USERPROFILE
         match original_home {
-            Some(home) => env::set_var("HOME", home),
-            None => env::remove_var("HOME"),
+            Some(home) => {
+                if cfg!(windows) {
+                    env::set_var("USERPROFILE", home);
+                } else {
+                    env::set_var("HOME", home);
+                }
+            }
+            None => {
+                if cfg!(windows) {
+                    env::remove_var("USERPROFILE");
+                } else {
+                    env::remove_var("HOME");
+                }
+            }
         }
     }
 
@@ -205,8 +230,19 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let temp_home = temp_dir.path().to_path_buf();
 
-        let original_home = env::var("HOME").ok();
-        env::set_var("HOME", &temp_home);
+        // Save original HOME/USERPROFILE for restoration
+        let original_home = if cfg!(windows) {
+            env::var("USERPROFILE").ok()
+        } else {
+            env::var("HOME").ok()
+        };
+
+        // Set appropriate home directory variable
+        if cfg!(windows) {
+            env::set_var("USERPROFILE", &temp_home);
+        } else {
+            env::set_var("HOME", &temp_home);
+        }
 
         let client = ClaudeCodeClient::new();
         let servers = client.list_servers().unwrap();
@@ -223,8 +259,19 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let temp_home = temp_dir.path().to_path_buf();
 
-        let original_home = env::var("HOME").ok();
-        env::set_var("HOME", &temp_home);
+        // Save original HOME/USERPROFILE for restoration
+        let original_home = if cfg!(windows) {
+            env::var("USERPROFILE").ok()
+        } else {
+            env::var("HOME").ok()
+        };
+
+        // Set appropriate home directory variable
+        if cfg!(windows) {
+            env::set_var("USERPROFILE", &temp_home);
+        } else {
+            env::set_var("HOME", &temp_home);
+        }
 
         let client = ClaudeCodeClient::new();
 
@@ -239,15 +286,42 @@ mod tests {
 
         client.add_server("env-test", config).unwrap();
 
+        // Verify config file was created
+        let config_path = temp_home.join(".claude.json");
+        assert!(
+            config_path.exists(),
+            "Config file should exist at {config_path:?}"
+        );
+
         // List servers and verify
         let servers = client.list_servers().unwrap();
-        assert_eq!(servers.len(), 1);
+        let server_count = servers.len();
+        assert_eq!(server_count, 1, "Expected 1 server, found {server_count}");
+        let server_keys = servers.keys().collect::<Vec<_>>();
+        assert!(
+            servers.contains_key("env-test"),
+            "Server 'env-test' not found in {server_keys:?}"
+        );
+
         let server = &servers["env-test"];
         assert_eq!(server.env.get("API_KEY"), Some(&"test-key".to_string()));
 
+        // Restore original HOME/USERPROFILE
         match original_home {
-            Some(home) => env::set_var("HOME", home),
-            None => env::remove_var("HOME"),
+            Some(home) => {
+                if cfg!(windows) {
+                    env::set_var("USERPROFILE", home);
+                } else {
+                    env::set_var("HOME", home);
+                }
+            }
+            None => {
+                if cfg!(windows) {
+                    env::remove_var("USERPROFILE");
+                } else {
+                    env::remove_var("HOME");
+                }
+            }
         }
     }
 
@@ -256,8 +330,19 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let temp_home = temp_dir.path().to_path_buf();
 
-        let original_home = env::var("HOME").ok();
-        env::set_var("HOME", &temp_home);
+        // Save original HOME/USERPROFILE for restoration
+        let original_home = if cfg!(windows) {
+            env::var("USERPROFILE").ok()
+        } else {
+            env::var("HOME").ok()
+        };
+
+        // Set appropriate home directory variable
+        if cfg!(windows) {
+            env::set_var("USERPROFILE", &temp_home);
+        } else {
+            env::set_var("HOME", &temp_home);
+        }
 
         // Create config with existing settings
         let config_path = temp_home.join(".claude.json");
@@ -297,8 +382,19 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let temp_home = temp_dir.path().to_path_buf();
 
-        let original_home = env::var("HOME").ok();
-        env::set_var("HOME", &temp_home);
+        // Save original HOME/USERPROFILE for restoration
+        let original_home = if cfg!(windows) {
+            env::var("USERPROFILE").ok()
+        } else {
+            env::var("HOME").ok()
+        };
+
+        // Set appropriate home directory variable
+        if cfg!(windows) {
+            env::set_var("USERPROFILE", &temp_home);
+        } else {
+            env::set_var("HOME", &temp_home);
+        }
 
         // Create config with rich real-world data structure
         let config_path = temp_home.join(".claude.json");

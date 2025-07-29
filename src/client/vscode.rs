@@ -203,8 +203,19 @@ mod tests {
         let temp_home = temp_dir.path().to_path_buf();
 
         // Temporarily override HOME for this test
-        let original_home = env::var("HOME").ok();
-        env::set_var("HOME", &temp_home);
+        // Save original HOME/USERPROFILE for restoration
+        let original_home = if cfg!(windows) {
+            env::var("USERPROFILE").ok()
+        } else {
+            env::var("HOME").ok()
+        };
+
+        // Set appropriate home directory variable
+        if cfg!(windows) {
+            env::set_var("USERPROFILE", &temp_home);
+        } else {
+            env::set_var("HOME", &temp_home);
+        }
 
         let client = VSCodeClient::new();
 
@@ -227,9 +238,22 @@ mod tests {
         assert!(content.contains("python"));
 
         // Restore original HOME
+        // Restore original HOME/USERPROFILE
         match original_home {
-            Some(home) => env::set_var("HOME", home),
-            None => env::remove_var("HOME"),
+            Some(home) => {
+                if cfg!(windows) {
+                    env::set_var("USERPROFILE", home);
+                } else {
+                    env::set_var("HOME", home);
+                }
+            }
+            None => {
+                if cfg!(windows) {
+                    env::remove_var("USERPROFILE");
+                } else {
+                    env::remove_var("HOME");
+                }
+            }
         }
     }
 
@@ -238,8 +262,19 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let temp_home = temp_dir.path().to_path_buf();
 
-        let original_home = env::var("HOME").ok();
-        env::set_var("HOME", &temp_home);
+        // Save original HOME/USERPROFILE for restoration
+        let original_home = if cfg!(windows) {
+            env::var("USERPROFILE").ok()
+        } else {
+            env::var("HOME").ok()
+        };
+
+        // Set appropriate home directory variable
+        if cfg!(windows) {
+            env::set_var("USERPROFILE", &temp_home);
+        } else {
+            env::set_var("HOME", &temp_home);
+        }
 
         let client = VSCodeClient::new();
 
@@ -261,9 +296,22 @@ mod tests {
         assert_eq!(server.command, "deno");
         assert_eq!(server.args, vec!["run", "server.ts"]);
 
+        // Restore original HOME/USERPROFILE
         match original_home {
-            Some(home) => env::set_var("HOME", home),
-            None => env::remove_var("HOME"),
+            Some(home) => {
+                if cfg!(windows) {
+                    env::set_var("USERPROFILE", home);
+                } else {
+                    env::set_var("HOME", home);
+                }
+            }
+            None => {
+                if cfg!(windows) {
+                    env::remove_var("USERPROFILE");
+                } else {
+                    env::remove_var("HOME");
+                }
+            }
         }
     }
 

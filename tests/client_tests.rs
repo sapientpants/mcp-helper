@@ -145,6 +145,12 @@ fn test_mock_client_trait_methods() {
 #[test]
 fn test_detect_clients() {
     let clients = mcp_helper::client::detect_clients();
-    assert_eq!(clients.len(), 1); // Claude Desktop client is now registered
-    assert_eq!(clients[0].name(), "Claude Desktop");
+    assert_eq!(clients.len(), 5); // Now we have 5 clients registered
+
+    let names: Vec<&str> = clients.iter().map(|c| c.name()).collect();
+    assert!(names.contains(&"Claude Code"));
+    assert!(names.contains(&"Claude Desktop"));
+    assert!(names.contains(&"Cursor"));
+    assert!(names.contains(&"VS Code"));
+    assert!(names.contains(&"Windsurf"));
 }

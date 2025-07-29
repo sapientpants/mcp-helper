@@ -77,17 +77,17 @@ test: test-unit test-integration
 # Test unit - run unit tests only
 test-unit:
 	@echo "Running unit tests..."
-	@$(CARGO) test --lib
+	@$(CARGO) test --lib -- --test-threads=1
 
 # Test integration - run integration tests only  
 test-integration:
 	@echo "Running integration tests..."
-	@$(CARGO) test --test '*'
+	@$(CARGO) test --test '*' -- --test-threads=1
 
 # Test all with verbose output
 test-all:
 	@echo "Running all tests with verbose output..."
-	@$(CARGO) test --all -- --nocapture
+	@$(CARGO) test --all -- --nocapture --test-threads=1
 
 # Format code
 fmt:

@@ -55,8 +55,19 @@ fn test_multiple_client_installation() {
     let temp_home = temp_dir.path().to_path_buf();
 
     // Override HOME for test
-    let original_home = env::var("HOME").ok();
-    env::set_var("HOME", &temp_home);
+    // Save original HOME/USERPROFILE for restoration
+    let original_home = if cfg!(windows) {
+        env::var("USERPROFILE").ok()
+    } else {
+        env::var("HOME").ok()
+    };
+
+    // Set appropriate home directory variable
+    if cfg!(windows) {
+        env::set_var("USERPROFILE", &temp_home);
+    } else {
+        env::set_var("HOME", &temp_home);
+    }
 
     let clients: Vec<Box<dyn McpClient>> = vec![
         Box::new(CursorClient::new()),
@@ -132,9 +143,22 @@ fn test_multiple_client_installation() {
     }
 
     // Restore HOME
+    // Restore original HOME/USERPROFILE
     match original_home {
-        Some(home) => env::set_var("HOME", home),
-        None => env::remove_var("HOME"),
+        Some(home) => {
+            if cfg!(windows) {
+                env::set_var("USERPROFILE", home);
+            } else {
+                env::set_var("HOME", home);
+            }
+        }
+        None => {
+            if cfg!(windows) {
+                env::remove_var("USERPROFILE");
+            } else {
+                env::remove_var("HOME");
+            }
+        }
     }
 }
 
@@ -145,8 +169,19 @@ fn test_client_config_formats() {
     let temp_dir = TempDir::new().unwrap();
     let temp_home = temp_dir.path().to_path_buf();
 
-    let original_home = env::var("HOME").ok();
-    env::set_var("HOME", &temp_home);
+    // Save original HOME/USERPROFILE for restoration
+    let original_home = if cfg!(windows) {
+        env::var("USERPROFILE").ok()
+    } else {
+        env::var("HOME").ok()
+    };
+
+    // Set appropriate home directory variable
+    if cfg!(windows) {
+        env::set_var("USERPROFILE", &temp_home);
+    } else {
+        env::set_var("HOME", &temp_home);
+    }
 
     // Test Cursor format
     let cursor = CursorClient::new();
@@ -207,9 +242,22 @@ fn test_client_config_formats() {
     .unwrap();
     assert!(windsurf_content.contains("\"mcpServers\""));
 
+    // Restore original HOME/USERPROFILE
     match original_home {
-        Some(home) => env::set_var("HOME", home),
-        None => env::remove_var("HOME"),
+        Some(home) => {
+            if cfg!(windows) {
+                env::set_var("USERPROFILE", home);
+            } else {
+                env::set_var("HOME", home);
+            }
+        }
+        None => {
+            if cfg!(windows) {
+                env::remove_var("USERPROFILE");
+            } else {
+                env::remove_var("HOME");
+            }
+        }
     }
 }
 
@@ -218,8 +266,19 @@ fn test_detect_installed_clients() {
     let temp_dir = TempDir::new().unwrap();
     let temp_home = temp_dir.path().to_path_buf();
 
-    let original_home = env::var("HOME").ok();
-    env::set_var("HOME", &temp_home);
+    // Save original HOME/USERPROFILE for restoration
+    let original_home = if cfg!(windows) {
+        env::var("USERPROFILE").ok()
+    } else {
+        env::var("HOME").ok()
+    };
+
+    // Set appropriate home directory variable
+    if cfg!(windows) {
+        env::set_var("USERPROFILE", &temp_home);
+    } else {
+        env::set_var("HOME", &temp_home);
+    }
 
     // Create config directories for some clients
     fs::create_dir_all(temp_home.join(".cursor")).unwrap();
@@ -252,9 +311,22 @@ fn test_detect_installed_clients() {
     assert!(names.contains(&"Windsurf"));
     assert!(!names.contains(&"VS Code"));
 
+    // Restore original HOME/USERPROFILE
     match original_home {
-        Some(home) => env::set_var("HOME", home),
-        None => env::remove_var("HOME"),
+        Some(home) => {
+            if cfg!(windows) {
+                env::set_var("USERPROFILE", home);
+            } else {
+                env::set_var("HOME", home);
+            }
+        }
+        None => {
+            if cfg!(windows) {
+                env::remove_var("USERPROFILE");
+            } else {
+                env::remove_var("HOME");
+            }
+        }
     }
 }
 
@@ -263,8 +335,19 @@ fn test_client_with_env_vars() {
     let temp_dir = TempDir::new().unwrap();
     let temp_home = temp_dir.path().to_path_buf();
 
-    let original_home = env::var("HOME").ok();
-    env::set_var("HOME", &temp_home);
+    // Save original HOME/USERPROFILE for restoration
+    let original_home = if cfg!(windows) {
+        env::var("USERPROFILE").ok()
+    } else {
+        env::var("HOME").ok()
+    };
+
+    // Set appropriate home directory variable
+    if cfg!(windows) {
+        env::set_var("USERPROFILE", &temp_home);
+    } else {
+        env::set_var("HOME", &temp_home);
+    }
 
     let mut env = HashMap::new();
     env.insert("API_KEY".to_string(), "secret-key".to_string());
@@ -294,8 +377,21 @@ fn test_client_with_env_vars() {
         assert_eq!(server.env.get("DEBUG"), Some(&"true".to_string()));
     }
 
+    // Restore original HOME/USERPROFILE
     match original_home {
-        Some(home) => env::set_var("HOME", home),
-        None => env::remove_var("HOME"),
+        Some(home) => {
+            if cfg!(windows) {
+                env::set_var("USERPROFILE", home);
+            } else {
+                env::set_var("HOME", home);
+            }
+        }
+        None => {
+            if cfg!(windows) {
+                env::remove_var("USERPROFILE");
+            } else {
+                env::remove_var("HOME");
+            }
+        }
     }
 }
