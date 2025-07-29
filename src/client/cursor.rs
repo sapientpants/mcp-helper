@@ -57,10 +57,24 @@ impl McpClient for CursorClient {
 
     fn is_installed(&self) -> bool {
         // Check if Cursor config directory exists
-        let cursor_dir = directories::BaseDirs::new()
-            .map(|dirs| dirs.home_dir().join(".cursor"))
-            .unwrap_or_default();
+        let home = if let Some(base_dirs) = directories::BaseDirs::new() {
+            base_dirs.home_dir().to_path_buf()
+        } else {
+            // Fallback to environment variables if BaseDirs can't be determined
+            #[cfg(windows)]
+            {
+                PathBuf::from(
+                    env::var("USERPROFILE")
+                        .unwrap_or_else(|_| env::var("HOME").unwrap_or_else(|_| ".".to_string())),
+                )
+            }
+            #[cfg(not(windows))]
+            {
+                PathBuf::from(env::var("HOME").unwrap_or_else(|_| ".".to_string()))
+            }
+        };
 
+        let cursor_dir = home.join(".cursor");
         cursor_dir.exists()
     }
 
