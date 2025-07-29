@@ -291,4 +291,161 @@ mod tests {
             None => env::remove_var("HOME"),
         }
     }
+
+    #[test]
+    fn test_claude_code_preserves_rich_user_data() {
+        let temp_dir = TempDir::new().unwrap();
+        let temp_home = temp_dir.path().to_path_buf();
+
+        let original_home = env::var("HOME").ok();
+        env::set_var("HOME", &temp_home);
+
+        // Create config with rich real-world data structure
+        let config_path = temp_home.join(".claude.json");
+
+        let existing_config = r#"{
+            "numStartups": 369,
+            "installMethod": "unknown",
+            "autoUpdates": true,
+            "customApiKeyResponses": {
+                "approved": ["3PYRUprgfmQ-oSMxHgAA"],
+                "rejected": []
+            },
+            "tipsHistory": {
+                "memory-command": 49,
+                "theme-command": 352,
+                "prompt-queue": 26,
+                "todo-list": 359
+            },
+            "memoryUsageCount": 19,
+            "promptQueueUseCount": 70,
+            "autoUpdaterStatus": "enabled",
+            "userID": "54e6bddd7992c80159c5d61f8cdfedca9e14c4af5ca0a391a5b94dbd59a82094",
+            "hasCompletedOnboarding": true,
+            "lastOnboardingVersion": "0.2.8",
+            "projects": {
+                "/Users/test/project1": {
+                    "allowedTools": ["write", "read"],
+                    "history": [
+                        {
+                            "display": "test command",
+                            "pastedContents": {}
+                        }
+                    ],
+                    "dontCrawlDirectory": false,
+                    "mcpContextUris": [],
+                    "mcpServers": {
+                        "project-server": {
+                            "command": "node",
+                            "args": ["server.js"]
+                        }
+                    },
+                    "enabledMcpjsonServers": [],
+                    "disabledMcpjsonServers": [],
+                    "hasTrustDialogAccepted": true
+                }
+            },
+            "maxSubscriptionNoticeCount": 1,
+            "hasAvailableMaxSubscription": false,
+            "firstStartTime": "2025-05-13T04:28:26.892Z",
+            "claudeMaxTier": "not_max",
+            "hasSeenGAAnnounce": true,
+            "mcpServers": {
+                "existing-global": {
+                    "command": "npx",
+                    "args": ["-y", "some-mcp-server"]
+                }
+            }
+        }"#;
+        fs::write(&config_path, existing_config).unwrap();
+
+        let client = ClaudeCodeClient::new();
+
+        // Add a new MCP server
+        let mut env = HashMap::new();
+        env.insert("API_KEY".to_string(), "test-key".to_string());
+
+        let config = ServerConfig {
+            command: "node".to_string(),
+            args: vec!["new-server.js".to_string()],
+            env,
+        };
+
+        client.add_server("new-test-server", config).unwrap();
+
+        // Read the config back and parse it
+        let content = fs::read_to_string(&config_path).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+        // Verify all rich user data is preserved
+        assert_eq!(parsed["numStartups"], 369);
+        assert_eq!(parsed["installMethod"], "unknown");
+        assert_eq!(parsed["autoUpdates"], true);
+        assert_eq!(
+            parsed["userID"],
+            "54e6bddd7992c80159c5d61f8cdfedca9e14c4af5ca0a391a5b94dbd59a82094"
+        );
+        assert_eq!(parsed["hasCompletedOnboarding"], true);
+        assert_eq!(parsed["lastOnboardingVersion"], "0.2.8");
+        assert_eq!(parsed["memoryUsageCount"], 19);
+        assert_eq!(parsed["promptQueueUseCount"], 70);
+        assert_eq!(parsed["autoUpdaterStatus"], "enabled");
+        assert_eq!(parsed["maxSubscriptionNoticeCount"], 1);
+        assert_eq!(parsed["hasAvailableMaxSubscription"], false);
+        assert_eq!(parsed["firstStartTime"], "2025-05-13T04:28:26.892Z");
+        assert_eq!(parsed["claudeMaxTier"], "not_max");
+        assert_eq!(parsed["hasSeenGAAnnounce"], true);
+
+        // Verify customApiKeyResponses structure
+        assert_eq!(
+            parsed["customApiKeyResponses"]["approved"][0],
+            "3PYRUprgfmQ-oSMxHgAA"
+        );
+        assert!(parsed["customApiKeyResponses"]["rejected"].is_array());
+
+        // Verify tipsHistory
+        assert_eq!(parsed["tipsHistory"]["memory-command"], 49);
+        assert_eq!(parsed["tipsHistory"]["theme-command"], 352);
+        assert_eq!(parsed["tipsHistory"]["prompt-queue"], 26);
+        assert_eq!(parsed["tipsHistory"]["todo-list"], 359);
+
+        // Verify projects structure is preserved including project-specific mcpServers
+        let project = &parsed["projects"]["/Users/test/project1"];
+        assert_eq!(project["allowedTools"][0], "write");
+        assert_eq!(project["allowedTools"][1], "read");
+        assert_eq!(project["history"][0]["display"], "test command");
+        assert_eq!(project["dontCrawlDirectory"], false);
+        assert_eq!(project["hasTrustDialogAccepted"], true);
+
+        // Verify project-specific mcpServers are untouched
+        assert_eq!(project["mcpServers"]["project-server"]["command"], "node");
+        assert_eq!(
+            project["mcpServers"]["project-server"]["args"][0],
+            "server.js"
+        );
+
+        // Verify existing global server is preserved
+        assert_eq!(parsed["mcpServers"]["existing-global"]["command"], "npx");
+        assert_eq!(parsed["mcpServers"]["existing-global"]["args"][0], "-y");
+        assert_eq!(
+            parsed["mcpServers"]["existing-global"]["args"][1],
+            "some-mcp-server"
+        );
+
+        // Verify new server was added
+        assert_eq!(parsed["mcpServers"]["new-test-server"]["command"], "node");
+        assert_eq!(
+            parsed["mcpServers"]["new-test-server"]["args"][0],
+            "new-server.js"
+        );
+        assert_eq!(
+            parsed["mcpServers"]["new-test-server"]["env"]["API_KEY"],
+            "test-key"
+        );
+
+        match original_home {
+            Some(home) => env::set_var("HOME", home),
+            None => env::remove_var("HOME"),
+        }
+    }
 }
