@@ -2,6 +2,7 @@ use crate::client::{McpClient, ServerConfig};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tempfile::NamedTempFile;
@@ -35,10 +36,22 @@ impl McpClient for CursorClient {
         // 1. Global: ~/.cursor/mcp.json
         // 2. Project: .cursor/mcp.json (in project root)
         // For installation, we'll use the global config
-        let home = directories::BaseDirs::new()
-            .expect("Could not determine base directories")
-            .home_dir()
-            .to_path_buf();
+        let home = if let Some(base_dirs) = directories::BaseDirs::new() {
+            base_dirs.home_dir().to_path_buf()
+        } else {
+            // Fallback to environment variables if BaseDirs can't be determined
+            #[cfg(windows)]
+            {
+                PathBuf::from(
+                    env::var("USERPROFILE")
+                        .unwrap_or_else(|_| env::var("HOME").unwrap_or_else(|_| ".".to_string())),
+                )
+            }
+            #[cfg(not(windows))]
+            {
+                PathBuf::from(env::var("HOME").unwrap_or_else(|_| ".".to_string()))
+            }
+        };
         home.join(".cursor").join("mcp.json")
     }
 

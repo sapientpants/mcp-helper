@@ -2,6 +2,7 @@ use crate::client::{McpClient, ServerConfig};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tempfile::NamedTempFile;
@@ -32,10 +33,22 @@ impl McpClient for ClaudeCodeClient {
 
     fn config_path(&self) -> PathBuf {
         // Claude Code uses ~/.claude.json for user MCP servers
-        let home = directories::BaseDirs::new()
-            .expect("Could not determine base directories")
-            .home_dir()
-            .to_path_buf();
+        let home = if let Some(base_dirs) = directories::BaseDirs::new() {
+            base_dirs.home_dir().to_path_buf()
+        } else {
+            // Fallback to environment variables if BaseDirs can't be determined
+            #[cfg(windows)]
+            {
+                PathBuf::from(
+                    env::var("USERPROFILE")
+                        .unwrap_or_else(|_| env::var("HOME").unwrap_or_else(|_| ".".to_string())),
+                )
+            }
+            #[cfg(not(windows))]
+            {
+                PathBuf::from(env::var("HOME").unwrap_or_else(|_| ".".to_string()))
+            }
+        };
         home.join(".claude.json")
     }
 
@@ -248,9 +261,22 @@ mod tests {
         let servers = client.list_servers().unwrap();
         assert!(servers.is_empty());
 
+        // Restore original HOME/USERPROFILE
         match original_home {
-            Some(home) => env::set_var("HOME", home),
-            None => env::remove_var("HOME"),
+            Some(home) => {
+                if cfg!(windows) {
+                    env::set_var("USERPROFILE", home);
+                } else {
+                    env::set_var("HOME", home);
+                }
+            }
+            None => {
+                if cfg!(windows) {
+                    env::remove_var("USERPROFILE");
+                } else {
+                    env::remove_var("HOME");
+                }
+            }
         }
     }
 
@@ -371,9 +397,22 @@ mod tests {
         assert!(content.contains("\"otherSetting\": true"));
         assert!(content.contains("mcpServers"));
 
+        // Restore original HOME/USERPROFILE
         match original_home {
-            Some(home) => env::set_var("HOME", home),
-            None => env::remove_var("HOME"),
+            Some(home) => {
+                if cfg!(windows) {
+                    env::set_var("USERPROFILE", home);
+                } else {
+                    env::set_var("HOME", home);
+                }
+            }
+            None => {
+                if cfg!(windows) {
+                    env::remove_var("USERPROFILE");
+                } else {
+                    env::remove_var("HOME");
+                }
+            }
         }
     }
 
@@ -539,9 +578,22 @@ mod tests {
             "test-key"
         );
 
+        // Restore original HOME/USERPROFILE
         match original_home {
-            Some(home) => env::set_var("HOME", home),
-            None => env::remove_var("HOME"),
+            Some(home) => {
+                if cfg!(windows) {
+                    env::set_var("USERPROFILE", home);
+                } else {
+                    env::set_var("HOME", home);
+                }
+            }
+            None => {
+                if cfg!(windows) {
+                    env::remove_var("USERPROFILE");
+                } else {
+                    env::remove_var("HOME");
+                }
+            }
         }
     }
 }

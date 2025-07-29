@@ -2,6 +2,7 @@ use crate::client::{McpClient, ServerConfig};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tempfile::NamedTempFile;
@@ -66,10 +67,22 @@ impl McpClient for VSCodeClient {
 
     fn config_path(&self) -> PathBuf {
         // VS Code uses ~/.vscode/mcp.json
-        let home = directories::BaseDirs::new()
-            .expect("Could not determine base directories")
-            .home_dir()
-            .to_path_buf();
+        let home = if let Some(base_dirs) = directories::BaseDirs::new() {
+            base_dirs.home_dir().to_path_buf()
+        } else {
+            // Fallback to environment variables if BaseDirs can't be determined
+            #[cfg(windows)]
+            {
+                PathBuf::from(
+                    env::var("USERPROFILE")
+                        .unwrap_or_else(|_| env::var("HOME").unwrap_or_else(|_| ".".to_string())),
+                )
+            }
+            #[cfg(not(windows))]
+            {
+                PathBuf::from(env::var("HOME").unwrap_or_else(|_| ".".to_string()))
+            }
+        };
         home.join(".vscode").join("mcp.json")
     }
 
