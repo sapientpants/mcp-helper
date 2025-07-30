@@ -38,10 +38,9 @@ impl Default for VSCodeClient {
 }
 
 impl VSCodeClient {
-    /// Check if GitHub Copilot extension is installed
-    fn check_copilot_installed(&self) -> bool {
-        // Get home directory with fallback
-        let home = self.home_provider.home_dir().unwrap_or_else(|| {
+    /// Get home directory with fallback
+    fn get_home_directory(&self) -> PathBuf {
+        self.home_provider.home_dir().unwrap_or_else(|| {
             // Fallback to environment variables if home dir can't be determined
             #[cfg(windows)]
             {
@@ -54,36 +53,59 @@ impl VSCodeClient {
             {
                 PathBuf::from(env::var("HOME").unwrap_or_else(|_| ".".to_string()))
             }
-        });
+        })
+    }
 
-        // Check common VS Code extension locations
-        let extension_dirs = vec![
-            Some(home.join(".vscode").join("extensions")),
-            Some(home.join(".vscode-server").join("extensions")),
-            self.home_provider.home_dir().and_then(|_home_dir| {
-                directories::BaseDirs::new().and_then(|d| {
-                    d.data_local_dir()
-                        .parent()
-                        .map(|p| p.join("vscode").join("extensions").to_path_buf())
-                })
-            }),
+    /// Get VS Code extension directories
+    fn get_extension_directories(&self) -> Vec<PathBuf> {
+        let home = self.get_home_directory();
+        let mut dirs = vec![
+            home.join(".vscode").join("extensions"),
+            home.join(".vscode-server").join("extensions"),
         ];
 
-        for dir in extension_dirs.into_iter().flatten() {
-            if dir.exists() {
-                // Look for GitHub Copilot extension
-                if let Ok(entries) = fs::read_dir(&dir) {
-                    for entry in entries.flatten() {
-                        if let Some(name) = entry.file_name().to_str() {
-                            if name.starts_with("github.copilot") {
-                                return true;
-                            }
-                        }
-                    }
-                }
-            }
+        // Add system extension directory if available
+        if let Some(system_dir) = self.get_system_extension_directory() {
+            dirs.push(system_dir);
         }
-        false
+
+        dirs
+    }
+
+    /// Get system VS Code extension directory
+    fn get_system_extension_directory(&self) -> Option<PathBuf> {
+        self.home_provider.home_dir().and_then(|_| {
+            directories::BaseDirs::new()?
+                .data_local_dir()
+                .parent()
+                .map(|p| p.join("vscode").join("extensions").to_path_buf())
+        })
+    }
+
+    /// Check if a directory contains GitHub Copilot extension
+    fn directory_has_copilot(&self, dir: &Path) -> bool {
+        if !dir.exists() {
+            return false;
+        }
+
+        let Ok(entries) = fs::read_dir(dir) else {
+            return false;
+        };
+
+        entries.flatten().any(|entry| {
+            entry
+                .file_name()
+                .to_str()
+                .map(|name| name.starts_with("github.copilot"))
+                .unwrap_or(false)
+        })
+    }
+
+    /// Check if GitHub Copilot extension is installed
+    fn check_copilot_installed(&self) -> bool {
+        self.get_extension_directories()
+            .iter()
+            .any(|dir| self.directory_has_copilot(dir))
     }
 }
 
@@ -94,41 +116,12 @@ impl McpClient for VSCodeClient {
 
     fn config_path(&self) -> PathBuf {
         // VS Code uses ~/.vscode/mcp.json
-        let home = self.home_provider.home_dir().unwrap_or_else(|| {
-            // Fallback to environment variables if home dir can't be determined
-            #[cfg(windows)]
-            {
-                PathBuf::from(
-                    env::var("USERPROFILE")
-                        .unwrap_or_else(|_| env::var("HOME").unwrap_or_else(|_| ".".to_string())),
-                )
-            }
-            #[cfg(not(windows))]
-            {
-                PathBuf::from(env::var("HOME").unwrap_or_else(|_| ".".to_string()))
-            }
-        });
-        home.join(".vscode").join("mcp.json")
+        self.get_home_directory().join(".vscode").join("mcp.json")
     }
 
     fn is_installed(&self) -> bool {
         // Check if VS Code config directory exists
-        let home = self.home_provider.home_dir().unwrap_or_else(|| {
-            // Fallback to environment variables if home dir can't be determined
-            #[cfg(windows)]
-            {
-                PathBuf::from(
-                    env::var("USERPROFILE")
-                        .unwrap_or_else(|_| env::var("HOME").unwrap_or_else(|_| ".".to_string())),
-                )
-            }
-            #[cfg(not(windows))]
-            {
-                PathBuf::from(env::var("HOME").unwrap_or_else(|_| ".".to_string()))
-            }
-        });
-
-        let vscode_dir = home.join(".vscode");
+        let vscode_dir = self.get_home_directory().join(".vscode");
         vscode_dir.exists()
     }
 

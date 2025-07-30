@@ -137,6 +137,120 @@ fn write_section_header(f: &mut fmt::Formatter<'_>, title: &str) -> fmt::Result 
     writeln!(f, "{}", title.green().bold())
 }
 
+impl McpError {
+    fn fmt_missing_dependency(
+        f: &mut fmt::Formatter<'_>,
+        dependency: &str,
+        required_version: &Option<String>,
+        install_instructions: &InstallInstructions,
+    ) -> fmt::Result {
+        write_error_header(f, "Missing dependency", dependency)?;
+        if let Some(version) = required_version {
+            write_detail(f, "Required version", version)?;
+        }
+        write_section_header(f, "How to install:")?;
+        format_install_instructions(f, install_instructions)
+    }
+
+    fn fmt_version_mismatch(
+        f: &mut fmt::Formatter<'_>,
+        dependency: &str,
+        current_version: &str,
+        required_version: &str,
+        upgrade_instructions: &InstallInstructions,
+    ) -> fmt::Result {
+        write_error_header(f, "Version mismatch for", dependency)?;
+        write_detail(f, "Current version", current_version)?;
+        write_detail(f, "Required version", required_version)?;
+        write_section_header(f, "How to upgrade:")?;
+        format_install_instructions(f, upgrade_instructions)
+    }
+
+    fn fmt_configuration_required(
+        f: &mut fmt::Formatter<'_>,
+        server_name: &str,
+        missing_fields: &[String],
+        field_descriptions: &[(String, String)],
+    ) -> fmt::Result {
+        write_error_header(f, "Configuration required for", server_name)?;
+        writeln!(f)?;
+        writeln!(f, "{}", "Missing fields:".red())?;
+        for field in missing_fields {
+            writeln!(f, "  {} {}", "•".blue(), field)?;
+        }
+        if !field_descriptions.is_empty() {
+            writeln!(f)?;
+            writeln!(f, "{}", "Field descriptions:".green())?;
+            for (field, desc) in field_descriptions {
+                writeln!(f, "  {} {}: {}", "→".blue(), field.bold(), desc)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn fmt_client_not_found(
+        f: &mut fmt::Formatter<'_>,
+        client_name: &str,
+        available_clients: &[String],
+        install_guidance: &str,
+    ) -> fmt::Result {
+        writeln!(
+            f,
+            "{} MCP client not found: {}",
+            "✗".red().bold(),
+            client_name.yellow()
+        )?;
+        if !available_clients.is_empty() {
+            writeln!(f)?;
+            writeln!(f, "{}", "Available clients:".green())?;
+            for client in available_clients {
+                writeln!(f, "  {} {}", "•".blue(), client)?;
+            }
+        }
+        writeln!(f)?;
+        writeln!(f, "{}", "Installation guidance:".green().bold())?;
+        writeln!(f, "  {install_guidance}")
+    }
+
+    fn fmt_config_error(f: &mut fmt::Formatter<'_>, path: &str, message: &str) -> fmt::Result {
+        writeln!(f, "{} Configuration error", "✗".red().bold())?;
+        writeln!(f, "  {} Path: {}", "→".blue(), path.yellow())?;
+        writeln!(f, "  {} Error: {}", "→".blue(), message)
+    }
+
+    fn fmt_server_error(
+        f: &mut fmt::Formatter<'_>,
+        server_name: &str,
+        message: &str,
+    ) -> fmt::Result {
+        writeln!(
+            f,
+            "{} Server error: {}",
+            "✗".red().bold(),
+            server_name.yellow()
+        )?;
+        writeln!(f, "  {} {}", "→".blue(), message)
+    }
+
+    fn fmt_io_error(
+        f: &mut fmt::Formatter<'_>,
+        operation: &str,
+        path: &Option<String>,
+        source: &std::io::Error,
+    ) -> fmt::Result {
+        writeln!(
+            f,
+            "{} I/O error during: {}",
+            "✗".red().bold(),
+            operation.yellow()
+        )?;
+        if let Some(path) = path {
+            writeln!(f, "  {} Path: {}", "→".blue(), path)?;
+        }
+        writeln!(f, "  {} Error: {}", "→".blue(), source)
+    }
+}
+
 impl fmt::Display for McpError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -145,106 +259,42 @@ impl fmt::Display for McpError {
                 required_version,
                 install_instructions,
             } => {
-                write_error_header(f, "Missing dependency", dependency)?;
-                if let Some(version) = required_version {
-                    write_detail(f, "Required version", version)?;
-                }
-                write_section_header(f, "How to install:")?;
-                format_install_instructions(f, install_instructions)?;
-                Ok(())
+                Self::fmt_missing_dependency(f, dependency, required_version, install_instructions)
             }
             Self::VersionMismatch {
                 dependency,
                 current_version,
                 required_version,
                 upgrade_instructions,
-            } => {
-                write_error_header(f, "Version mismatch for", dependency)?;
-                write_detail(f, "Current version", current_version)?;
-                write_detail(f, "Required version", required_version)?;
-                write_section_header(f, "How to upgrade:")?;
-                format_install_instructions(f, upgrade_instructions)?;
-                Ok(())
-            }
+            } => Self::fmt_version_mismatch(
+                f,
+                dependency,
+                current_version,
+                required_version,
+                upgrade_instructions,
+            ),
             Self::ConfigurationRequired {
                 server_name,
                 missing_fields,
                 field_descriptions,
             } => {
-                write_error_header(f, "Configuration required for", server_name)?;
-                writeln!(f)?;
-                writeln!(f, "{}", "Missing fields:".red())?;
-                for field in missing_fields {
-                    writeln!(f, "  {} {}", "•".blue(), field)?;
-                }
-                if !field_descriptions.is_empty() {
-                    writeln!(f)?;
-                    writeln!(f, "{}", "Field descriptions:".green())?;
-                    for (field, desc) in field_descriptions {
-                        writeln!(f, "  {} {}: {}", "→".blue(), field.bold(), desc)?;
-                    }
-                }
-                Ok(())
+                Self::fmt_configuration_required(f, server_name, missing_fields, field_descriptions)
             }
             Self::ClientNotFound {
                 client_name,
                 available_clients,
                 install_guidance,
-            } => {
-                writeln!(
-                    f,
-                    "{} MCP client not found: {}",
-                    "✗".red().bold(),
-                    client_name.yellow()
-                )?;
-                if !available_clients.is_empty() {
-                    writeln!(f)?;
-                    writeln!(f, "{}", "Available clients:".green())?;
-                    for client in available_clients {
-                        writeln!(f, "  {} {}", "•".blue(), client)?;
-                    }
-                }
-                writeln!(f)?;
-                writeln!(f, "{}", "Installation guidance:".green().bold())?;
-                writeln!(f, "  {install_guidance}")?;
-                Ok(())
-            }
-            Self::ConfigError { path, message } => {
-                writeln!(f, "{} Configuration error", "✗".red().bold())?;
-                writeln!(f, "  {} Path: {}", "→".blue(), path.yellow())?;
-                writeln!(f, "  {} Error: {}", "→".blue(), message)?;
-                Ok(())
-            }
+            } => Self::fmt_client_not_found(f, client_name, available_clients, install_guidance),
+            Self::ConfigError { path, message } => Self::fmt_config_error(f, path, message),
             Self::ServerError {
                 server_name,
                 message,
-            } => {
-                writeln!(
-                    f,
-                    "{} Server error: {}",
-                    "✗".red().bold(),
-                    server_name.yellow()
-                )?;
-                writeln!(f, "  {} {}", "→".blue(), message)?;
-                Ok(())
-            }
+            } => Self::fmt_server_error(f, server_name, message),
             Self::IoError {
                 operation,
                 path,
                 source,
-            } => {
-                writeln!(
-                    f,
-                    "{} I/O error during: {}",
-                    "✗".red().bold(),
-                    operation.yellow()
-                )?;
-                if let Some(path) = path {
-                    writeln!(f, "  {} Path: {}", "→".blue(), path)?;
-                }
-                writeln!(f, "  {} Error: {}", "→".blue(), source)?;
-                Ok(())
-            }
+            } => Self::fmt_io_error(f, operation, path, source),
             Self::Other(err) => write!(f, "{} {}", "✗".red().bold(), err),
         }
     }
