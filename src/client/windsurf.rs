@@ -198,6 +198,11 @@ mod tests {
 
     #[test]
     fn test_windsurf_add_server() {
+        // Skip this test when running under coverage that has issues with env var manipulation
+        if env::var("SKIP_ENV_TESTS").is_ok() {
+            return;
+        }
+
         let temp_dir = TempDir::new().unwrap();
         let temp_home = temp_dir.path().to_path_buf();
 
@@ -307,6 +312,11 @@ mod tests {
 
     #[test]
     fn test_windsurf_config_format() {
+        // Skip this test when running under coverage that has issues with env var manipulation
+        if env::var("SKIP_ENV_TESTS").is_ok() {
+            return;
+        }
+
         let temp_dir = TempDir::new().unwrap();
         let temp_home = temp_dir.path().to_path_buf();
 
