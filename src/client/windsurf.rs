@@ -1,4 +1,4 @@
-use crate::client::{McpClient, ServerConfig};
+use crate::client::{HomeDirectoryProvider, McpClient, RealHomeDirectoryProvider, ServerConfig};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -10,12 +10,22 @@ use tempfile::NamedTempFile;
 /// Windsurf (Codeium) MCP client implementation
 pub struct WindsurfClient {
     name: String,
+    home_provider: Box<dyn HomeDirectoryProvider>,
 }
 
 impl WindsurfClient {
     pub fn new() -> Self {
         Self {
             name: "Windsurf".to_string(),
+            home_provider: Box::new(RealHomeDirectoryProvider),
+        }
+    }
+
+    #[cfg(test)]
+    pub fn new_with_provider(home_provider: Box<dyn HomeDirectoryProvider>) -> Self {
+        Self {
+            name: "Windsurf".to_string(),
+            home_provider,
         }
     }
 }
@@ -33,10 +43,8 @@ impl McpClient for WindsurfClient {
 
     fn config_path(&self) -> PathBuf {
         // Windsurf uses ~/.codeium/windsurf/mcp_config.json
-        let home = if let Some(base_dirs) = directories::BaseDirs::new() {
-            base_dirs.home_dir().to_path_buf()
-        } else {
-            // Fallback to environment variables if BaseDirs can't be determined
+        let home = self.home_provider.home_dir().unwrap_or_else(|| {
+            // Fallback to environment variables if home dir can't be determined
             #[cfg(windows)]
             {
                 PathBuf::from(
@@ -48,7 +56,7 @@ impl McpClient for WindsurfClient {
             {
                 PathBuf::from(env::var("HOME").unwrap_or_else(|_| ".".to_string()))
             }
-        };
+        });
         home.join(".codeium")
             .join("windsurf")
             .join("mcp_config.json")
@@ -56,10 +64,8 @@ impl McpClient for WindsurfClient {
 
     fn is_installed(&self) -> bool {
         // Check if Windsurf/Codeium config directory exists
-        let home = if let Some(base_dirs) = directories::BaseDirs::new() {
-            base_dirs.home_dir().to_path_buf()
-        } else {
-            // Fallback to environment variables if BaseDirs can't be determined
+        let home = self.home_provider.home_dir().unwrap_or_else(|| {
+            // Fallback to environment variables if home dir can't be determined
             #[cfg(windows)]
             {
                 PathBuf::from(
@@ -71,7 +77,7 @@ impl McpClient for WindsurfClient {
             {
                 PathBuf::from(env::var("HOME").unwrap_or_else(|_| ".".to_string()))
             }
-        };
+        });
 
         let windsurf_dir = home.join(".codeium").join("windsurf");
         windsurf_dir.exists()
@@ -171,9 +177,8 @@ struct WindsurfServer {
 
 #[cfg(test)]
 mod tests {
-    // NOTE: These tests modify HOME environment variable and should be run with --test-threads=1
     use super::*;
-    use std::env;
+    use crate::client::MockHomeDirectoryProvider;
     use tempfile::TempDir;
 
     #[test]
@@ -198,30 +203,11 @@ mod tests {
 
     #[test]
     fn test_windsurf_add_server() {
-        // Skip this test when running under coverage that has issues with env var manipulation
-        if env::var("SKIP_ENV_TESTS").is_ok() {
-            return;
-        }
-
         let temp_dir = TempDir::new().unwrap();
-        let temp_home = temp_dir.path().to_path_buf();
-
-        // Temporarily override HOME for this test
-        // Save original HOME/USERPROFILE for restoration
-        let original_home = if cfg!(windows) {
-            env::var("USERPROFILE").ok()
-        } else {
-            env::var("HOME").ok()
-        };
-
-        // Set appropriate home directory variable
-        if cfg!(windows) {
-            env::set_var("USERPROFILE", &temp_home);
-        } else {
-            env::set_var("HOME", &temp_home);
-        }
-
-        let client = WindsurfClient::new();
+        let mock_provider = Box::new(MockHomeDirectoryProvider::new(
+            temp_dir.path().to_path_buf(),
+        ));
+        let client = WindsurfClient::new_with_provider(mock_provider);
 
         let mut env = HashMap::new();
         env.insert("API_KEY".to_string(), "test-key".to_string());
@@ -236,7 +222,8 @@ mod tests {
         assert!(result.is_ok());
 
         // Verify the config was written correctly
-        let config_path = temp_home
+        let config_path = temp_dir
+            .path()
             .join(".codeium")
             .join("windsurf")
             .join("mcp_config.json");
@@ -247,94 +234,27 @@ mod tests {
         assert!(content.contains("mcpServers"));
         assert!(content.contains("npx"));
         assert!(content.contains("API_KEY"));
-
-        // Restore original HOME
-        // Restore original HOME/USERPROFILE
-        match original_home {
-            Some(home) => {
-                if cfg!(windows) {
-                    env::set_var("USERPROFILE", home);
-                } else {
-                    env::set_var("HOME", home);
-                }
-            }
-            None => {
-                if cfg!(windows) {
-                    env::remove_var("USERPROFILE");
-                } else {
-                    env::remove_var("HOME");
-                }
-            }
-        }
     }
 
     #[test]
     fn test_windsurf_list_servers_empty() {
         let temp_dir = TempDir::new().unwrap();
-        let temp_home = temp_dir.path().to_path_buf();
+        let mock_provider = Box::new(MockHomeDirectoryProvider::new(
+            temp_dir.path().to_path_buf(),
+        ));
+        let client = WindsurfClient::new_with_provider(mock_provider);
 
-        // Save original HOME/USERPROFILE for restoration
-        let original_home = if cfg!(windows) {
-            env::var("USERPROFILE").ok()
-        } else {
-            env::var("HOME").ok()
-        };
-
-        // Set appropriate home directory variable
-        if cfg!(windows) {
-            env::set_var("USERPROFILE", &temp_home);
-        } else {
-            env::set_var("HOME", &temp_home);
-        }
-
-        let client = WindsurfClient::new();
         let servers = client.list_servers().unwrap();
         assert!(servers.is_empty());
-
-        // Restore original HOME/USERPROFILE
-        match original_home {
-            Some(home) => {
-                if cfg!(windows) {
-                    env::set_var("USERPROFILE", home);
-                } else {
-                    env::set_var("HOME", home);
-                }
-            }
-            None => {
-                if cfg!(windows) {
-                    env::remove_var("USERPROFILE");
-                } else {
-                    env::remove_var("HOME");
-                }
-            }
-        }
     }
 
     #[test]
     fn test_windsurf_config_format() {
-        // Skip this test when running under coverage that has issues with env var manipulation
-        if env::var("SKIP_ENV_TESTS").is_ok() {
-            return;
-        }
-
         let temp_dir = TempDir::new().unwrap();
-        let temp_home = temp_dir.path().to_path_buf();
-
-        // Save original HOME/USERPROFILE for restoration
-        let original_home = if cfg!(windows) {
-            env::var("USERPROFILE").ok()
-        } else {
-            env::var("HOME").ok()
-        };
-
-        // Set appropriate home directory variable
-        if cfg!(windows) {
-            env::set_var("USERPROFILE", &temp_home);
-        } else {
-            env::set_var("HOME", &temp_home);
-        }
-
-        let client = WindsurfClient::new();
+        let mock_provider = Box::new(MockHomeDirectoryProvider::new(
+            temp_dir.path().to_path_buf(),
+        ));
+        let client = WindsurfClient::new_with_provider(mock_provider);
 
         // Add server without env vars
         let config = ServerConfig {
@@ -346,7 +266,8 @@ mod tests {
         client.add_server("python-server", config).unwrap();
 
         // Check the JSON format
-        let config_path = temp_home
+        let config_path = temp_dir
+            .path()
             .join(".codeium")
             .join("windsurf")
             .join("mcp_config.json");
@@ -355,23 +276,5 @@ mod tests {
         // Env should not be present when empty
         assert!(!content.contains("\"env\": {}"));
         assert!(!content.contains("\"serverUrl\""));
-
-        // Restore original HOME/USERPROFILE
-        match original_home {
-            Some(home) => {
-                if cfg!(windows) {
-                    env::set_var("USERPROFILE", home);
-                } else {
-                    env::set_var("HOME", home);
-                }
-            }
-            None => {
-                if cfg!(windows) {
-                    env::remove_var("USERPROFILE");
-                } else {
-                    env::remove_var("HOME");
-                }
-            }
-        }
     }
 }

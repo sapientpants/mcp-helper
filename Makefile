@@ -168,8 +168,7 @@ coverage:
 # Coverage for CI - doesn't open browser
 coverage-ci:
 	@echo "Generating coverage report for CI..."
-	@echo "Running tarpaulin with environment variable to skip problematic tests..."
-	@SKIP_ENV_TESTS=1 $(CARGO) tarpaulin --out Html --out Lcov --lib --bins --timeout 600 || (echo "Install cargo-tarpaulin with: cargo install cargo-tarpaulin" && exit 1)
+	@$(CARGO) tarpaulin --out Html --out Lcov --lib --bins --timeout 600 || (echo "Install cargo-tarpaulin with: cargo install cargo-tarpaulin" && exit 1)
 
 # Watch for changes and rebuild (requires cargo-watch)
 watch:

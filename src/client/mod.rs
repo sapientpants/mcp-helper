@@ -70,6 +70,42 @@ impl Default for ClientRegistry {
     }
 }
 
+/// Trait for providing home directory paths
+/// This abstraction allows us to mock directory resolution in tests
+pub trait HomeDirectoryProvider: Send + Sync {
+    /// Get the user's home directory
+    fn home_dir(&self) -> Option<PathBuf>;
+}
+
+/// Real implementation using directories crate
+pub struct RealHomeDirectoryProvider;
+
+impl HomeDirectoryProvider for RealHomeDirectoryProvider {
+    fn home_dir(&self) -> Option<PathBuf> {
+        directories::BaseDirs::new().map(|dirs| dirs.home_dir().to_path_buf())
+    }
+}
+
+/// Mock implementation for testing
+#[cfg(test)]
+pub struct MockHomeDirectoryProvider {
+    home_path: PathBuf,
+}
+
+#[cfg(test)]
+impl MockHomeDirectoryProvider {
+    pub fn new(home_path: PathBuf) -> Self {
+        Self { home_path }
+    }
+}
+
+#[cfg(test)]
+impl HomeDirectoryProvider for MockHomeDirectoryProvider {
+    fn home_dir(&self) -> Option<PathBuf> {
+        Some(self.home_path.clone())
+    }
+}
+
 pub fn detect_clients() -> Vec<Box<dyn McpClient>> {
     let mut registry = ClientRegistry::new();
 

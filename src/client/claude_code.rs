@@ -1,4 +1,4 @@
-use crate::client::{McpClient, ServerConfig};
+use crate::client::{HomeDirectoryProvider, McpClient, RealHomeDirectoryProvider, ServerConfig};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -10,12 +10,22 @@ use tempfile::NamedTempFile;
 /// Claude Code MCP client implementation
 pub struct ClaudeCodeClient {
     name: String,
+    home_provider: Box<dyn HomeDirectoryProvider>,
 }
 
 impl ClaudeCodeClient {
     pub fn new() -> Self {
         Self {
             name: "Claude Code".to_string(),
+            home_provider: Box::new(RealHomeDirectoryProvider),
+        }
+    }
+
+    #[cfg(test)]
+    pub fn new_with_provider(home_provider: Box<dyn HomeDirectoryProvider>) -> Self {
+        Self {
+            name: "Claude Code".to_string(),
+            home_provider,
         }
     }
 }
@@ -33,10 +43,8 @@ impl McpClient for ClaudeCodeClient {
 
     fn config_path(&self) -> PathBuf {
         // Claude Code uses ~/.claude.json for user MCP servers
-        let home = if let Some(base_dirs) = directories::BaseDirs::new() {
-            base_dirs.home_dir().to_path_buf()
-        } else {
-            // Fallback to environment variables if BaseDirs can't be determined
+        let home = self.home_provider.home_dir().unwrap_or_else(|| {
+            // Fallback to environment variables if home dir can't be determined
             #[cfg(windows)]
             {
                 PathBuf::from(
@@ -48,7 +56,7 @@ impl McpClient for ClaudeCodeClient {
             {
                 PathBuf::from(env::var("HOME").unwrap_or_else(|_| ".".to_string()))
             }
-        };
+        });
         home.join(".claude.json")
     }
 
@@ -152,9 +160,8 @@ struct ClaudeCodeServer {
 
 #[cfg(test)]
 mod tests {
-    // NOTE: These tests modify HOME environment variable and should be run with --test-threads=1
     use super::*;
-    use std::env;
+    use crate::client::MockHomeDirectoryProvider;
     use tempfile::TempDir;
 
     #[test]
@@ -179,29 +186,11 @@ mod tests {
 
     #[test]
     fn test_claude_code_add_server() {
-        // Skip this test when running under coverage that has issues with env var manipulation
-        if env::var("SKIP_ENV_TESTS").is_ok() {
-            return;
-        }
-
         let temp_dir = TempDir::new().unwrap();
-        let temp_home = temp_dir.path().to_path_buf();
-
-        // Save original HOME/USERPROFILE for restoration
-        let original_home = if cfg!(windows) {
-            env::var("USERPROFILE").ok()
-        } else {
-            env::var("HOME").ok()
-        };
-
-        // Set appropriate home directory variable
-        if cfg!(windows) {
-            env::set_var("USERPROFILE", &temp_home);
-        } else {
-            env::set_var("HOME", &temp_home);
-        }
-
-        let client = ClaudeCodeClient::new();
+        let mock_provider = Box::new(MockHomeDirectoryProvider::new(
+            temp_dir.path().to_path_buf(),
+        ));
+        let client = ClaudeCodeClient::new_with_provider(mock_provider);
 
         let config = ServerConfig {
             command: "node".to_string(),
@@ -213,7 +202,7 @@ mod tests {
         assert!(result.is_ok(), "Failed to add server: {result:?}");
 
         // Verify the config was written correctly
-        let config_path = temp_home.join(".claude.json");
+        let config_path = temp_dir.path().join(".claude.json");
         assert!(
             config_path.exists(),
             "Config file should exist at {config_path:?}"
@@ -223,93 +212,28 @@ mod tests {
         assert!(content.contains("test-server"));
         assert!(content.contains("mcpServers"));
         assert!(content.contains("node"));
-
-        // Restore original HOME/USERPROFILE
-        match original_home {
-            Some(home) => {
-                if cfg!(windows) {
-                    env::set_var("USERPROFILE", home);
-                } else {
-                    env::set_var("HOME", home);
-                }
-            }
-            None => {
-                if cfg!(windows) {
-                    env::remove_var("USERPROFILE");
-                } else {
-                    env::remove_var("HOME");
-                }
-            }
-        }
     }
 
     #[test]
     fn test_claude_code_list_servers_empty() {
         let temp_dir = TempDir::new().unwrap();
-        let temp_home = temp_dir.path().to_path_buf();
+        let mock_provider = Box::new(MockHomeDirectoryProvider::new(
+            temp_dir.path().to_path_buf(),
+        ));
+        let client = ClaudeCodeClient::new_with_provider(mock_provider);
 
-        // Save original HOME/USERPROFILE for restoration
-        let original_home = if cfg!(windows) {
-            env::var("USERPROFILE").ok()
-        } else {
-            env::var("HOME").ok()
-        };
-
-        // Set appropriate home directory variable
-        if cfg!(windows) {
-            env::set_var("USERPROFILE", &temp_home);
-        } else {
-            env::set_var("HOME", &temp_home);
-        }
-
-        let client = ClaudeCodeClient::new();
+        // Test listing servers when config doesn't exist
         let servers = client.list_servers().unwrap();
         assert!(servers.is_empty());
-
-        // Restore original HOME/USERPROFILE
-        match original_home {
-            Some(home) => {
-                if cfg!(windows) {
-                    env::set_var("USERPROFILE", home);
-                } else {
-                    env::set_var("HOME", home);
-                }
-            }
-            None => {
-                if cfg!(windows) {
-                    env::remove_var("USERPROFILE");
-                } else {
-                    env::remove_var("HOME");
-                }
-            }
-        }
     }
 
     #[test]
     fn test_claude_code_with_env_vars() {
-        // Skip this test when running under coverage that has issues with env var manipulation
-        if env::var("SKIP_ENV_TESTS").is_ok() {
-            return;
-        }
-
         let temp_dir = TempDir::new().unwrap();
-        let temp_home = temp_dir.path().to_path_buf();
-
-        // Save original HOME/USERPROFILE for restoration
-        let original_home = if cfg!(windows) {
-            env::var("USERPROFILE").ok()
-        } else {
-            env::var("HOME").ok()
-        };
-
-        // Set appropriate home directory variable
-        if cfg!(windows) {
-            env::set_var("USERPROFILE", &temp_home);
-        } else {
-            env::set_var("HOME", &temp_home);
-        }
-
-        let client = ClaudeCodeClient::new();
+        let mock_provider = Box::new(MockHomeDirectoryProvider::new(
+            temp_dir.path().to_path_buf(),
+        ));
+        let client = ClaudeCodeClient::new_with_provider(mock_provider);
 
         let mut env = HashMap::new();
         env.insert("API_KEY".to_string(), "test-key".to_string());
@@ -323,7 +247,7 @@ mod tests {
         client.add_server("env-test", config).unwrap();
 
         // Verify config file was created
-        let config_path = temp_home.join(".claude.json");
+        let config_path = temp_dir.path().join(".claude.json");
         assert!(
             config_path.exists(),
             "Config file should exist at {config_path:?}"
@@ -341,52 +265,18 @@ mod tests {
 
         let server = &servers["env-test"];
         assert_eq!(server.env.get("API_KEY"), Some(&"test-key".to_string()));
-
-        // Restore original HOME/USERPROFILE
-        match original_home {
-            Some(home) => {
-                if cfg!(windows) {
-                    env::set_var("USERPROFILE", home);
-                } else {
-                    env::set_var("HOME", home);
-                }
-            }
-            None => {
-                if cfg!(windows) {
-                    env::remove_var("USERPROFILE");
-                } else {
-                    env::remove_var("HOME");
-                }
-            }
-        }
     }
 
     #[test]
     fn test_claude_code_preserves_other_settings() {
-        // Skip this test when running under coverage that has issues with env var manipulation
-        if env::var("SKIP_ENV_TESTS").is_ok() {
-            return;
-        }
-
         let temp_dir = TempDir::new().unwrap();
-        let temp_home = temp_dir.path().to_path_buf();
-
-        // Save original HOME/USERPROFILE for restoration
-        let original_home = if cfg!(windows) {
-            env::var("USERPROFILE").ok()
-        } else {
-            env::var("HOME").ok()
-        };
-
-        // Set appropriate home directory variable
-        if cfg!(windows) {
-            env::set_var("USERPROFILE", &temp_home);
-        } else {
-            env::set_var("HOME", &temp_home);
-        }
+        let mock_provider = Box::new(MockHomeDirectoryProvider::new(
+            temp_dir.path().to_path_buf(),
+        ));
+        let client = ClaudeCodeClient::new_with_provider(mock_provider);
 
         // Create config with existing settings
-        let config_path = temp_home.join(".claude.json");
+        let config_path = temp_dir.path().join(".claude.json");
 
         let existing_config = r#"{
             "theme": "dark",
@@ -394,8 +284,6 @@ mod tests {
             "otherSetting": true
         }"#;
         fs::write(&config_path, existing_config).unwrap();
-
-        let client = ClaudeCodeClient::new();
 
         let config = ServerConfig {
             command: "test".to_string(),
@@ -411,52 +299,18 @@ mod tests {
         assert!(content.contains("\"fontSize\": 14"));
         assert!(content.contains("\"otherSetting\": true"));
         assert!(content.contains("mcpServers"));
-
-        // Restore original HOME/USERPROFILE
-        match original_home {
-            Some(home) => {
-                if cfg!(windows) {
-                    env::set_var("USERPROFILE", home);
-                } else {
-                    env::set_var("HOME", home);
-                }
-            }
-            None => {
-                if cfg!(windows) {
-                    env::remove_var("USERPROFILE");
-                } else {
-                    env::remove_var("HOME");
-                }
-            }
-        }
     }
 
     #[test]
     fn test_claude_code_preserves_rich_user_data() {
-        // Skip this test when running under coverage that has issues with env var manipulation
-        if env::var("SKIP_ENV_TESTS").is_ok() {
-            return;
-        }
-
         let temp_dir = TempDir::new().unwrap();
-        let temp_home = temp_dir.path().to_path_buf();
-
-        // Save original HOME/USERPROFILE for restoration
-        let original_home = if cfg!(windows) {
-            env::var("USERPROFILE").ok()
-        } else {
-            env::var("HOME").ok()
-        };
-
-        // Set appropriate home directory variable
-        if cfg!(windows) {
-            env::set_var("USERPROFILE", &temp_home);
-        } else {
-            env::set_var("HOME", &temp_home);
-        }
+        let mock_provider = Box::new(MockHomeDirectoryProvider::new(
+            temp_dir.path().to_path_buf(),
+        ));
+        let client = ClaudeCodeClient::new_with_provider(mock_provider);
 
         // Create config with rich real-world data structure
-        let config_path = temp_home.join(".claude.json");
+        let config_path = temp_dir.path().join(".claude.json");
 
         let existing_config = r#"{
             "numStartups": 369,
@@ -513,8 +367,6 @@ mod tests {
             }
         }"#;
         fs::write(&config_path, existing_config).unwrap();
-
-        let client = ClaudeCodeClient::new();
 
         // Add a new MCP server
         let mut env = HashMap::new();
@@ -597,23 +449,5 @@ mod tests {
             parsed["mcpServers"]["new-test-server"]["env"]["API_KEY"],
             "test-key"
         );
-
-        // Restore original HOME/USERPROFILE
-        match original_home {
-            Some(home) => {
-                if cfg!(windows) {
-                    env::set_var("USERPROFILE", home);
-                } else {
-                    env::set_var("HOME", home);
-                }
-            }
-            None => {
-                if cfg!(windows) {
-                    env::remove_var("USERPROFILE");
-                } else {
-                    env::remove_var("HOME");
-                }
-            }
-        }
     }
 }

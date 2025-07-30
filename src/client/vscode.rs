@@ -1,4 +1,4 @@
-use crate::client::{McpClient, ServerConfig};
+use crate::client::{HomeDirectoryProvider, McpClient, RealHomeDirectoryProvider, ServerConfig};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -11,12 +11,22 @@ use tempfile::NamedTempFile;
 /// Note: VS Code MCP support requires GitHub Copilot and is only available in Agent mode
 pub struct VSCodeClient {
     name: String,
+    home_provider: Box<dyn HomeDirectoryProvider>,
 }
 
 impl VSCodeClient {
     pub fn new() -> Self {
         Self {
             name: "VS Code".to_string(),
+            home_provider: Box::new(RealHomeDirectoryProvider),
+        }
+    }
+
+    #[cfg(test)]
+    pub fn new_with_provider(home_provider: Box<dyn HomeDirectoryProvider>) -> Self {
+        Self {
+            name: "VS Code".to_string(),
+            home_provider,
         }
     }
 }
@@ -31,10 +41,8 @@ impl VSCodeClient {
     /// Check if GitHub Copilot extension is installed
     fn check_copilot_installed(&self) -> bool {
         // Get home directory with fallback
-        let home = if let Some(base_dirs) = directories::BaseDirs::new() {
-            base_dirs.home_dir().to_path_buf()
-        } else {
-            // Fallback to environment variables if BaseDirs can't be determined
+        let home = self.home_provider.home_dir().unwrap_or_else(|| {
+            // Fallback to environment variables if home dir can't be determined
             #[cfg(windows)]
             {
                 PathBuf::from(
@@ -46,16 +54,18 @@ impl VSCodeClient {
             {
                 PathBuf::from(env::var("HOME").unwrap_or_else(|_| ".".to_string()))
             }
-        };
+        });
 
         // Check common VS Code extension locations
         let extension_dirs = vec![
             Some(home.join(".vscode").join("extensions")),
             Some(home.join(".vscode-server").join("extensions")),
-            directories::BaseDirs::new().and_then(|d| {
-                d.data_local_dir()
-                    .parent()
-                    .map(|p| p.join("vscode").join("extensions").to_path_buf())
+            self.home_provider.home_dir().and_then(|_home_dir| {
+                directories::BaseDirs::new().and_then(|d| {
+                    d.data_local_dir()
+                        .parent()
+                        .map(|p| p.join("vscode").join("extensions").to_path_buf())
+                })
             }),
         ];
 
@@ -84,10 +94,8 @@ impl McpClient for VSCodeClient {
 
     fn config_path(&self) -> PathBuf {
         // VS Code uses ~/.vscode/mcp.json
-        let home = if let Some(base_dirs) = directories::BaseDirs::new() {
-            base_dirs.home_dir().to_path_buf()
-        } else {
-            // Fallback to environment variables if BaseDirs can't be determined
+        let home = self.home_provider.home_dir().unwrap_or_else(|| {
+            // Fallback to environment variables if home dir can't be determined
             #[cfg(windows)]
             {
                 PathBuf::from(
@@ -99,16 +107,14 @@ impl McpClient for VSCodeClient {
             {
                 PathBuf::from(env::var("HOME").unwrap_or_else(|_| ".".to_string()))
             }
-        };
+        });
         home.join(".vscode").join("mcp.json")
     }
 
     fn is_installed(&self) -> bool {
         // Check if VS Code config directory exists
-        let home = if let Some(base_dirs) = directories::BaseDirs::new() {
-            base_dirs.home_dir().to_path_buf()
-        } else {
-            // Fallback to environment variables if BaseDirs can't be determined
+        let home = self.home_provider.home_dir().unwrap_or_else(|| {
+            // Fallback to environment variables if home dir can't be determined
             #[cfg(windows)]
             {
                 PathBuf::from(
@@ -120,7 +126,7 @@ impl McpClient for VSCodeClient {
             {
                 PathBuf::from(env::var("HOME").unwrap_or_else(|_| ".".to_string()))
             }
-        };
+        });
 
         let vscode_dir = home.join(".vscode");
         vscode_dir.exists()
@@ -216,9 +222,8 @@ struct VSCodeServer {
 
 #[cfg(test)]
 mod tests {
-    // NOTE: These tests modify HOME environment variable and should be run with --test-threads=1
     use super::*;
-    use std::env;
+    use crate::client::MockHomeDirectoryProvider;
     use tempfile::TempDir;
 
     #[test]
@@ -243,30 +248,11 @@ mod tests {
 
     #[test]
     fn test_vscode_add_server() {
-        // Skip this test when running under coverage that has issues with env var manipulation
-        if env::var("SKIP_ENV_TESTS").is_ok() {
-            return;
-        }
-
         let temp_dir = TempDir::new().unwrap();
-        let temp_home = temp_dir.path().to_path_buf();
-
-        // Temporarily override HOME for this test
-        // Save original HOME/USERPROFILE for restoration
-        let original_home = if cfg!(windows) {
-            env::var("USERPROFILE").ok()
-        } else {
-            env::var("HOME").ok()
-        };
-
-        // Set appropriate home directory variable
-        if cfg!(windows) {
-            env::set_var("USERPROFILE", &temp_home);
-        } else {
-            env::set_var("HOME", &temp_home);
-        }
-
-        let client = VSCodeClient::new();
+        let mock_provider = Box::new(MockHomeDirectoryProvider::new(
+            temp_dir.path().to_path_buf(),
+        ));
+        let client = VSCodeClient::new_with_provider(mock_provider);
 
         let config = ServerConfig {
             command: "python".to_string(),
@@ -278,59 +264,22 @@ mod tests {
         assert!(result.is_ok());
 
         // Verify the config was written correctly
-        let config_path = temp_home.join(".vscode").join("mcp.json");
+        let config_path = temp_dir.path().join(".vscode").join("mcp.json");
         assert!(config_path.exists());
 
         let content = fs::read_to_string(&config_path).unwrap();
         assert!(content.contains("test-server"));
         assert!(content.contains("\"type\": \"stdio\""));
         assert!(content.contains("python"));
-
-        // Restore original HOME
-        // Restore original HOME/USERPROFILE
-        match original_home {
-            Some(home) => {
-                if cfg!(windows) {
-                    env::set_var("USERPROFILE", home);
-                } else {
-                    env::set_var("HOME", home);
-                }
-            }
-            None => {
-                if cfg!(windows) {
-                    env::remove_var("USERPROFILE");
-                } else {
-                    env::remove_var("HOME");
-                }
-            }
-        }
     }
 
     #[test]
     fn test_vscode_list_servers_with_data() {
-        // Skip this test when running under coverage that has issues with env var manipulation
-        if env::var("SKIP_ENV_TESTS").is_ok() {
-            return;
-        }
-
         let temp_dir = TempDir::new().unwrap();
-        let temp_home = temp_dir.path().to_path_buf();
-
-        // Save original HOME/USERPROFILE for restoration
-        let original_home = if cfg!(windows) {
-            env::var("USERPROFILE").ok()
-        } else {
-            env::var("HOME").ok()
-        };
-
-        // Set appropriate home directory variable
-        if cfg!(windows) {
-            env::set_var("USERPROFILE", &temp_home);
-        } else {
-            env::set_var("HOME", &temp_home);
-        }
-
-        let client = VSCodeClient::new();
+        let mock_provider = Box::new(MockHomeDirectoryProvider::new(
+            temp_dir.path().to_path_buf(),
+        ));
+        let client = VSCodeClient::new_with_provider(mock_provider);
 
         // Add a server first
         let config = ServerConfig {
@@ -349,24 +298,6 @@ mod tests {
         let server = &servers["deno-server"];
         assert_eq!(server.command, "deno");
         assert_eq!(server.args, vec!["run", "server.ts"]);
-
-        // Restore original HOME/USERPROFILE
-        match original_home {
-            Some(home) => {
-                if cfg!(windows) {
-                    env::set_var("USERPROFILE", home);
-                } else {
-                    env::set_var("HOME", home);
-                }
-            }
-            None => {
-                if cfg!(windows) {
-                    env::remove_var("USERPROFILE");
-                } else {
-                    env::remove_var("HOME");
-                }
-            }
-        }
     }
 
     #[test]
