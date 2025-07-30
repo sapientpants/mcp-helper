@@ -48,6 +48,12 @@ enum Commands {
 
         #[arg(long, help = "Show what would be done without making changes")]
         dry_run: bool,
+
+        #[arg(long, help = "Configuration in key=value format (skips prompts)")]
+        config: Vec<String>,
+
+        #[arg(long, help = "Install servers from batch file")]
+        batch: Option<String>,
     },
 
     #[command(about = "One-time setup for your OS")]
@@ -99,16 +105,32 @@ fn main() {
             server,
             auto_install_deps,
             dry_run,
+            config,
+            batch,
         } => {
-            println!("{} Installing MCP server: {}", "→".green(), server.cyan());
             let mut install = InstallCommand::new(cli.verbose);
             install = install
                 .with_auto_install_deps(auto_install_deps)
-                .with_dry_run(dry_run);
-            install.execute(&server).map_err(|e| match e {
-                McpError::Other(err) => err,
-                _ => anyhow::anyhow!("{}", e),
-            })
+                .with_dry_run(dry_run)
+                .with_config_overrides(config);
+
+            if let Some(batch_file) = batch {
+                println!(
+                    "{} Installing servers from batch file: {}",
+                    "→".green(),
+                    batch_file.cyan()
+                );
+                install.execute_batch(&batch_file).map_err(|e| match e {
+                    McpError::Other(err) => err,
+                    _ => anyhow::anyhow!("{}", e),
+                })
+            } else {
+                println!("{} Installing MCP server: {}", "→".green(), server.cyan());
+                install.execute(&server).map_err(|e| match e {
+                    McpError::Other(err) => err,
+                    _ => anyhow::anyhow!("{}", e),
+                })
+            }
         }
         Commands::Setup => {
             println!("{}", "🔧 Running MCP Helper setup...".blue().bold());

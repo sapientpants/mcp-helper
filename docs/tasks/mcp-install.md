@@ -177,7 +177,7 @@ This document provides a detailed task breakdown for implementing the `mcp insta
 
 ## Phase 3: Advanced Features
 
-**Progress: Phase 3 (Sections 3.1-3.4) COMPLETED - Docker support, auto-dependency installation, server suggestions, and configuration management implemented**
+**Progress: Phase 3 (Sections 3.1-3.5) COMPLETED - Docker support, auto-dependency installation, server suggestions, configuration management, and advanced CLI options implemented**
 
 ### 3.1 Docker Server Support ✅ COMPLETED
 - [x] Create `src/server/docker.rs`
@@ -228,15 +228,15 @@ This document provides a detailed task breakdown for implementing the `mcp insta
   - [x] Allow undo operation
   - [x] Track configuration history
 
-### 3.5 Advanced CLI Options
-- [ ] Add `--config` flag for non-interactive
-  - [ ] Parse key=value pairs
-  - [ ] Validate against schema
-  - [ ] Skip prompts
-- [ ] Add batch installation support
-  - [ ] Read from file
-  - [ ] Install multiple servers
-  - [ ] Report success/failure
+### 3.5 Advanced CLI Options ✅ COMPLETED
+- [x] Add `--config` flag for non-interactive
+  - [x] Parse key=value pairs
+  - [x] Validate against schema
+  - [x] Skip prompts
+- [x] Add batch installation support
+  - [x] Read from file
+  - [x] Install multiple servers
+  - [x] Report success/failure
 
 ### 3.6 Testing Phase 3
 - [ ] Docker integration tests

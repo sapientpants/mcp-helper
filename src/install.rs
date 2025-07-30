@@ -1,6 +1,7 @@
 use colored::Colorize;
 use dialoguer::{Confirm, Input};
 use std::collections::HashMap;
+use std::fs;
 
 use crate::client::{detect_clients, ClientRegistry, ServerConfig};
 use crate::config::ConfigManager;
@@ -17,6 +18,7 @@ pub struct InstallCommand {
     auto_install_deps: bool,
     dry_run: bool,
     suggestions: ServerSuggestions,
+    config_overrides: HashMap<String, String>,
 }
 
 impl InstallCommand {
@@ -35,6 +37,7 @@ impl InstallCommand {
             auto_install_deps: false,
             dry_run: false,
             suggestions: ServerSuggestions::new(),
+            config_overrides: HashMap::new(),
         }
     }
 
@@ -46,6 +49,29 @@ impl InstallCommand {
     pub fn with_dry_run(mut self, dry_run: bool) -> Self {
         self.dry_run = dry_run;
         self
+    }
+
+    pub fn with_config_overrides(mut self, config_args: Vec<String>) -> Self {
+        self.config_overrides = Self::parse_config_args(&config_args);
+        self
+    }
+
+    fn parse_config_args(config_args: &[String]) -> HashMap<String, String> {
+        let mut config = HashMap::new();
+
+        for arg in config_args {
+            if let Some((key, value)) = arg.split_once('=') {
+                config.insert(key.trim().to_string(), value.trim().to_string());
+            } else {
+                eprintln!(
+                    "{} Invalid config format: '{}'. Expected key=value",
+                    "⚠".yellow(),
+                    arg
+                );
+            }
+        }
+
+        config
     }
 
     pub fn execute(&mut self, server_name: &str) -> Result<()> {
@@ -87,6 +113,116 @@ impl InstallCommand {
         );
 
         Ok(())
+    }
+
+    pub fn execute_batch(&mut self, batch_file: &str) -> Result<()> {
+        let batch_content = fs::read_to_string(batch_file).map_err(|e| {
+            McpError::Other(anyhow::anyhow!(
+                "Failed to read batch file '{}': {}",
+                batch_file,
+                e
+            ))
+        })?;
+
+        let batch_config = Self::parse_batch_file(&batch_content)?;
+
+        if batch_config.is_empty() {
+            return Err(McpError::Other(anyhow::anyhow!(
+                "No servers found in batch file"
+            )));
+        }
+
+        println!(
+            "{} Found {} server(s) to install",
+            "ℹ".blue(),
+            batch_config.len()
+        );
+
+        let mut success_count = 0;
+        let mut failure_count = 0;
+        let mut failures = Vec::new();
+
+        for (server_name, server_config) in batch_config {
+            println!("\n{} Installing {}", "→".green(), server_name.cyan());
+
+            // Set config overrides for this server
+            self.config_overrides = server_config;
+
+            match self.execute(&server_name) {
+                Ok(()) => {
+                    success_count += 1;
+                    println!("  {} Successfully installed {}", "✓".green(), server_name);
+                }
+                Err(e) => {
+                    failure_count += 1;
+                    failures.push((server_name.clone(), e.to_string()));
+                    eprintln!("  {} Failed to install {}: {}", "✗".red(), server_name, e);
+                }
+            }
+        }
+
+        println!("\n{} Batch installation complete:", "📊".blue());
+        println!("  {} {} successful", "✓".green(), success_count);
+
+        if failure_count > 0 {
+            println!("  {} {} failed", "✗".red(), failure_count);
+            println!("\n{} Failed installations:", "❌".red());
+            for (server, error) in failures {
+                println!("  • {}: {}", server.cyan(), error);
+            }
+            return Err(McpError::Other(anyhow::anyhow!(
+                "{} out of {} installations failed",
+                failure_count,
+                success_count + failure_count
+            )));
+        }
+
+        Ok(())
+    }
+
+    fn parse_batch_file(content: &str) -> Result<HashMap<String, HashMap<String, String>>> {
+        let mut servers = HashMap::new();
+        let mut current_server: Option<String> = None;
+        let mut current_config = HashMap::new();
+
+        for line in content.lines() {
+            let line = line.trim();
+
+            // Skip empty lines and comments
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+
+            // Check if this is a server declaration
+            if line.starts_with('[') && line.ends_with(']') {
+                // Save previous server if exists
+                if let Some(server_name) = current_server.take() {
+                    servers.insert(server_name, current_config.clone());
+                    current_config.clear();
+                }
+
+                // Start new server
+                current_server = Some(line[1..line.len() - 1].to_string());
+                continue;
+            }
+
+            // Parse key=value configuration
+            if let Some((key, value)) = line.split_once('=') {
+                current_config.insert(key.trim().to_string(), value.trim().to_string());
+            } else {
+                return Err(McpError::Other(anyhow::anyhow!(
+                    "Invalid line in batch file: '{}'. Expected key=value or [server-name]",
+                    line
+                )));
+            }
+        }
+
+        // Save the last server
+        if let Some(server_name) = current_server {
+            servers.insert(server_name, current_config);
+        }
+
+        Ok(servers)
     }
 
     fn create_server(&self, server_type: &ServerType) -> Result<Box<dyn McpServer>> {
@@ -448,6 +584,9 @@ impl InstallCommand {
         let metadata = server.metadata();
         let mut config = HashMap::new();
 
+        // Start with config overrides from command line
+        config.extend(self.config_overrides.clone());
+
         let all_fields: Vec<_> = metadata
             .required_config
             .iter()
@@ -461,13 +600,50 @@ impl InstallCommand {
             return Ok(config);
         }
 
-        println!("\n{}", "Configuration:".blue().bold());
+        // Check if we're in non-interactive mode (have config overrides)
+        let is_non_interactive = !self.config_overrides.is_empty();
+
+        if is_non_interactive {
+            if self.verbose {
+                eprintln!(
+                    "{} Using non-interactive mode with provided configuration",
+                    "ℹ".blue()
+                );
+            }
+        } else {
+            println!("\n{}", "Configuration:".blue().bold());
+        }
 
         for field in all_fields {
+            // Skip prompting if we already have this field from overrides
+            if config.contains_key(&field.name) {
+                if self.verbose {
+                    eprintln!(
+                        "  {} Using override for {}: {}",
+                        "→".green(),
+                        field.name,
+                        config[&field.name]
+                    );
+                }
+                continue;
+            }
+
             let is_required = metadata
                 .required_config
                 .iter()
                 .any(|f| f.name == field.name);
+
+            // In non-interactive mode, skip optional fields but fail on required ones
+            if is_non_interactive {
+                if is_required {
+                    return Err(McpError::Other(anyhow::anyhow!(
+                        "Required configuration field '{}' not provided via --config",
+                        field.name
+                    )));
+                }
+                continue;
+            }
+
             let prompt = Self::build_field_prompt(field, is_required);
 
             let value = match field.field_type {
