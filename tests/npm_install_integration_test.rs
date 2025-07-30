@@ -52,6 +52,10 @@ fn test_npm_server_install_flow() {
                     // Version mismatch is also a valid scenario
                     assert!(check.install_instructions.is_some());
                 }
+                DependencyStatus::ConfigurationRequired { .. } => {
+                    // Configuration required is also a valid scenario
+                    assert!(check.install_instructions.is_none());
+                }
             }
         }
         Err(_) => {

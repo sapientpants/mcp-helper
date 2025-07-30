@@ -153,7 +153,10 @@ fn test_version_mismatch_with_instructions() {
 #[test]
 fn test_handle_missing_dependency_without_instructions() {
     let check = DependencyCheck {
-        dependency: Dependency::Docker,
+        dependency: Dependency::Docker {
+            min_version: None,
+            requires_compose: false,
+        },
         status: DependencyStatus::Missing,
         install_instructions: None,
     };
@@ -190,7 +193,13 @@ fn test_all_dependency_types() {
             },
             "Python",
         ),
-        (Dependency::Docker, "Docker"),
+        (
+            Dependency::Docker {
+                min_version: None,
+                requires_compose: false,
+            },
+            "Docker",
+        ),
         (Dependency::Git, "Git"),
     ];
 
@@ -202,7 +211,7 @@ fn test_all_dependency_types() {
 
 #[test]
 fn test_execute_with_scoped_package_version() {
-    let cmd = InstallCommand::new(false);
+    let mut cmd = InstallCommand::new(false);
 
     // Test scoped package with version
     let result = cmd.execute("@scope/package@1.2.3");
@@ -211,34 +220,34 @@ fn test_execute_with_scoped_package_version() {
 
 #[test]
 fn test_execute_with_python_server() {
-    let cmd = InstallCommand::new(false);
+    let mut cmd = InstallCommand::new(false);
 
-    // Test Python server detection
+    // Test Python server detection (now supported in Phase 3)
     let result = cmd.execute("my_server.py");
-    assert!(result.is_err());
-
-    match result {
-        Err(McpError::ServerError { message, .. }) => {
-            assert!(message.contains("not yet supported"));
-        }
-        _ => panic!("Expected ServerError for unsupported Python server"),
+    // The command should work (though it might fail later due to missing clients or user interaction)
+    // What's important is that we don't get a "not yet supported" error
+    
+    if let Err(McpError::ServerError { message, .. }) = &result {
+        assert!(!message.contains("not yet supported"), 
+               "Python should now be supported but got: {}", message);
     }
+    // Other error types are acceptable (missing clients, dependency issues, etc.)
 }
 
 #[test]
 fn test_execute_with_binary_url() {
-    let cmd = InstallCommand::new(false);
+    let mut cmd = InstallCommand::new(false);
 
-    // Test binary URL detection
+    // Test binary URL detection (now supported in Phase 3)
     let result = cmd.execute("https://github.com/org/repo/releases/download/v1.0.0/server.tar.gz");
-    assert!(result.is_err());
-
-    match result {
-        Err(McpError::ServerError { message, .. }) => {
-            assert!(message.contains("not yet supported"));
-        }
-        _ => panic!("Expected ServerError for unsupported binary server"),
+    // The command should work (though it might fail later due to missing clients or user interaction)
+    // What's important is that we don't get a "not yet supported" error
+    
+    if let Err(McpError::ServerError { message, .. }) = &result {
+        assert!(!message.contains("not yet supported"), 
+               "Binary should now be supported but got: {}", message);
     }
+    // Other error types are acceptable (missing clients, dependency issues, etc.)
 }
 
 #[test]
@@ -305,7 +314,7 @@ fn test_server_metadata_variations() {
 
 #[test]
 fn test_verbose_execution_paths() {
-    let cmd_verbose = InstallCommand::new(true);
+    let mut cmd_verbose = InstallCommand::new(true);
 
     // Test various inputs in verbose mode
     let test_cases = vec![
@@ -325,8 +334,8 @@ fn test_verbose_execution_paths() {
 #[test]
 fn test_install_command_edge_cases() {
     // Test creating multiple instances
-    let cmd1 = InstallCommand::new(true);
-    let cmd2 = InstallCommand::new(false);
+    let mut cmd1 = InstallCommand::new(true);
+    let mut cmd2 = InstallCommand::new(false);
 
     // Both should work independently
     let _ = cmd1.execute("test1");

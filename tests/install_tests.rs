@@ -157,7 +157,7 @@ fn test_detect_server_type_docker() {
     match server_type {
         ServerType::Docker { image, tag } => {
             assert_eq!(image, "example/server");
-            assert_eq!(tag, "latest");
+            assert_eq!(tag, Some("latest".to_string()));
         }
         _ => panic!("Expected Docker server type"),
     }

@@ -14,7 +14,14 @@ fn test_dependency_name() {
         "Node.js"
     );
     assert_eq!(Dependency::Python { min_version: None }.name(), "Python");
-    assert_eq!(Dependency::Docker.name(), "Docker");
+    assert_eq!(
+        Dependency::Docker {
+            min_version: None,
+            requires_compose: false
+        }
+        .name(),
+        "Docker"
+    );
     assert_eq!(Dependency::Git.name(), "Git");
 }
 
@@ -150,7 +157,10 @@ fn test_get_install_instructions_python() {
 
 #[test]
 fn test_get_install_instructions_docker() {
-    let dep = Dependency::Docker;
+    let dep = Dependency::Docker {
+        min_version: None,
+        requires_compose: false,
+    };
     let instructions = get_install_instructions(&dep);
 
     assert!(!instructions.windows.is_empty());

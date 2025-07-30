@@ -42,6 +42,12 @@ enum Commands {
     Install {
         #[arg(help = "Name or path of the MCP server to install")]
         server: String,
+
+        #[arg(long, help = "Automatically install missing dependencies")]
+        auto_install_deps: bool,
+
+        #[arg(long, help = "Show what would be done without making changes")]
+        dry_run: bool,
     },
 
     #[command(about = "One-time setup for your OS")]
@@ -89,9 +95,16 @@ fn main() {
 
     let result = match cli.command {
         Commands::Run { server, args } => run_server(&server, &args, cli.verbose),
-        Commands::Install { server } => {
+        Commands::Install {
+            server,
+            auto_install_deps,
+            dry_run,
+        } => {
             println!("{} Installing MCP server: {}", "→".green(), server.cyan());
-            let install = InstallCommand::new(cli.verbose);
+            let mut install = InstallCommand::new(cli.verbose);
+            install = install
+                .with_auto_install_deps(auto_install_deps)
+                .with_dry_run(dry_run);
             install.execute(&server).map_err(|e| match e {
                 McpError::Other(err) => err,
                 _ => anyhow::anyhow!("{}", e),

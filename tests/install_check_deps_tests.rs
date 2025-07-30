@@ -103,7 +103,13 @@ fn test_get_dependency_name_all_variants() {
             },
             "Python",
         ),
-        (Dependency::Docker, "Docker"),
+        (
+            Dependency::Docker {
+                min_version: None,
+                requires_compose: false,
+            },
+            "Docker",
+        ),
         (Dependency::Git, "Git"),
     ];
 
@@ -173,23 +179,26 @@ fn test_build_field_prompt_all_combinations() {
 }
 
 #[test]
-fn test_create_server_docker_not_supported() {
-    let cmd = InstallCommand::new(false);
+fn test_create_server_docker_supported() {
+    let mut cmd = InstallCommand::new(false);
 
-    // Test Docker server type (not yet supported)
+    // Test Docker server type (now supported in Phase 3)
     let result = cmd.execute("docker:redis:latest");
-    assert!(result.is_err());
-
-    if let Err(McpError::ServerError { message, .. }) = result {
-        assert!(message.contains("not yet supported"));
-    } else {
-        panic!("Expected ServerError for unsupported Docker server");
+    // The command should work (though it might fail later due to missing clients or user interaction)
+    // What's important is that we don't get a "not yet supported" error
+    
+    // The result can be Ok (if user selects clients) or Err for other reasons
+    // but shouldn't be a "not yet supported" error
+    if let Err(McpError::ServerError { message, .. }) = &result {
+        assert!(!message.contains("not yet supported"), 
+               "Docker should now be supported but got: {}", message);
     }
+    // Other error types (like missing clients, dependency issues, etc.) are acceptable
 }
 
 #[test]
 fn test_create_server_local_not_supported() {
-    let cmd = InstallCommand::new(false);
+    let mut cmd = InstallCommand::new(false);
 
     // Test local file server type (not yet supported)
     let result = cmd.execute("./local/server/path");
@@ -198,7 +207,7 @@ fn test_create_server_local_not_supported() {
 
 #[test]
 fn test_execute_with_special_characters() {
-    let cmd = InstallCommand::new(false);
+    let mut cmd = InstallCommand::new(false);
 
     // Test server name with special characters
     let result = cmd.execute("@test/server-name_with.special~chars@1.0.0");
@@ -207,7 +216,7 @@ fn test_execute_with_special_characters() {
 
 #[test]
 fn test_install_command_verbose_mode() {
-    let cmd = InstallCommand::new(true);
+    let mut cmd = InstallCommand::new(true);
     // The verbose flag should be set
     // We can't directly check it, but running with verbose shouldn't panic
     let _ = cmd.execute("test-package");
@@ -215,7 +224,7 @@ fn test_install_command_verbose_mode() {
 
 #[test]
 fn test_empty_server_name_variations() {
-    let cmd = InstallCommand::new(false);
+    let mut cmd = InstallCommand::new(false);
 
     // Test various empty/whitespace server names
     let empty_names = vec!["", " ", "  ", "\t", "\n", " \t\n "];

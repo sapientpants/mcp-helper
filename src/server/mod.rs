@@ -1,7 +1,9 @@
 pub mod binary;
+pub mod docker;
 pub mod metadata;
 pub mod npm;
 pub mod python;
+pub mod suggestions;
 
 use anyhow::Result;
 use std::collections::HashMap;
@@ -9,11 +11,13 @@ use std::collections::HashMap;
 use crate::deps::DependencyChecker;
 
 pub use binary::BinaryServer;
+pub use docker::DockerServer;
 pub use metadata::{
     ExtendedServerMetadata, MetadataLoader, PlatformSupport, RegistryEntry, UsageExample,
 };
 pub use npm::NpmServer;
 pub use python::PythonServer;
+pub use suggestions::{ServerSuggestions, Suggestion, SuggestionFeasibility, SuggestionReason};
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ServerType {
@@ -31,7 +35,7 @@ pub enum ServerType {
     },
     Docker {
         image: String,
-        tag: String,
+        tag: Option<String>,
     },
 }
 
@@ -76,7 +80,7 @@ pub fn detect_server_type(package: &str) -> ServerType {
         let parts: Vec<&str> = stripped.splitn(2, ':').collect();
         ServerType::Docker {
             image: parts[0].to_string(),
-            tag: parts.get(1).unwrap_or(&"latest").to_string(),
+            tag: parts.get(1).map(|s| s.to_string()).or(Some("latest".to_string())),
         }
     } else if package.starts_with("https://") || package.starts_with("http://") {
         ServerType::Binary {

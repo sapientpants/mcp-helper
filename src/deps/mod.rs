@@ -1,3 +1,5 @@
+pub mod docker;
+pub mod installer;
 pub mod node;
 pub mod python;
 pub mod version;
@@ -5,6 +7,8 @@ pub mod version;
 use anyhow::Result;
 use std::fmt;
 
+pub use docker::DockerChecker;
+pub use installer::{detect_package_managers, DependencyInstaller};
 pub use node::NodeChecker;
 pub use python::PythonChecker;
 pub use version::{VersionHelper, VersionRequirement};
@@ -18,9 +22,16 @@ pub struct DependencyCheck {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Dependency {
-    NodeJs { min_version: Option<String> },
-    Python { min_version: Option<String> },
-    Docker,
+    NodeJs {
+        min_version: Option<String>,
+    },
+    Python {
+        min_version: Option<String>,
+    },
+    Docker {
+        min_version: Option<String>,
+        requires_compose: bool,
+    },
     Git,
 }
 
@@ -29,6 +40,7 @@ pub enum DependencyStatus {
     Installed { version: Option<String> },
     Missing,
     VersionMismatch { installed: String, required: String },
+    ConfigurationRequired { issue: String, solution: String },
 }
 
 #[derive(Debug, Clone, Default)]
@@ -54,7 +66,7 @@ impl Dependency {
         match self {
             Dependency::NodeJs { .. } => "Node.js",
             Dependency::Python { .. } => "Python",
-            Dependency::Docker => "Docker",
+            Dependency::Docker { .. } => "Docker",
             Dependency::Git => "Git",
         }
     }
@@ -79,6 +91,9 @@ impl fmt::Display for DependencyStatus {
                     f,
                     "Version mismatch (installed: {installed}, required: {required})"
                 )
+            }
+            DependencyStatus::ConfigurationRequired { issue, solution: _ } => {
+                write!(f, "Configuration required: {issue}")
             }
         }
     }
@@ -311,7 +326,7 @@ pub fn get_install_instructions(dependency: &Dependency) -> InstallInstructions 
     match dependency {
         Dependency::NodeJs { .. } => NODEJS_CONFIG.to_instructions(),
         Dependency::Python { .. } => PYTHON_CONFIG.to_instructions(),
-        Dependency::Docker => DOCKER_CONFIG.to_instructions(),
+        Dependency::Docker { .. } => DOCKER_CONFIG.to_instructions(),
         Dependency::Git => GIT_CONFIG.to_instructions(),
     }
 }

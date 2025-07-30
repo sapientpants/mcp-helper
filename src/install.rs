@@ -3,13 +3,18 @@ use dialoguer::{Confirm, Input};
 use std::collections::HashMap;
 
 use crate::client::{detect_clients, ClientRegistry, ServerConfig};
-use crate::deps::{Dependency, DependencyStatus};
+use crate::deps::{Dependency, DependencyInstaller, DependencyStatus};
 use crate::error::{McpError, Result};
-use crate::server::{detect_server_type, ConfigField, ConfigFieldType, McpServer, ServerType};
+use crate::server::{
+    detect_server_type, ConfigField, ConfigFieldType, McpServer, ServerSuggestions, ServerType,
+};
 
 pub struct InstallCommand {
     client_registry: ClientRegistry,
     verbose: bool,
+    auto_install_deps: bool,
+    dry_run: bool,
+    suggestions: ServerSuggestions,
 }
 
 impl InstallCommand {
@@ -24,10 +29,23 @@ impl InstallCommand {
         Self {
             client_registry,
             verbose,
+            auto_install_deps: false,
+            dry_run: false,
+            suggestions: ServerSuggestions::new(),
         }
     }
 
-    pub fn execute(&self, server_name: &str) -> Result<()> {
+    pub fn with_auto_install_deps(mut self, auto_install: bool) -> Self {
+        self.auto_install_deps = auto_install;
+        self
+    }
+
+    pub fn with_dry_run(mut self, dry_run: bool) -> Self {
+        self.dry_run = dry_run;
+        self
+    }
+
+    pub fn execute(&mut self, server_name: &str) -> Result<()> {
         if self.verbose {
             eprintln!("{} Detecting server type for: {}", "ℹ".blue(), server_name);
         }
@@ -77,10 +95,28 @@ impl InstallCommand {
                     version.clone(),
                 )))
             }
-            _ => Err(McpError::server_error(
-                format!("{server_type:?}"),
-                "This server type is not yet supported. Only NPM servers are currently implemented."
-            )),
+            ServerType::Binary { url, checksum } => {
+                use crate::server::binary::BinaryServer;
+                Ok(Box::new(BinaryServer::new(url, checksum.clone())))
+            }
+            ServerType::Python { package, version } => {
+                use crate::server::python::PythonServer;
+                let package_spec = if let Some(v) = version {
+                    format!("{package}=={v}")
+                } else {
+                    package.clone()
+                };
+                Ok(Box::new(PythonServer::new(&package_spec)?))
+            }
+            ServerType::Docker { image, tag } => {
+                use crate::server::docker::DockerServer;
+                let docker_spec = if let Some(t) = tag {
+                    format!("{image}:{t}")
+                } else {
+                    image.clone()
+                };
+                Ok(Box::new(DockerServer::new(&docker_spec)?))
+            }
         }
     }
 
@@ -88,7 +124,7 @@ impl InstallCommand {
         match dependency {
             Dependency::NodeJs { .. } => "Node.js",
             Dependency::Python { .. } => "Python",
-            Dependency::Docker => "Docker",
+            Dependency::Docker { .. } => "Docker",
             Dependency::Git => "Git",
         }
     }
@@ -131,7 +167,7 @@ impl InstallCommand {
         )))
     }
 
-    fn check_dependencies(&self, server: &dyn McpServer) -> Result<()> {
+    fn check_dependencies(&mut self, server: &dyn McpServer) -> Result<()> {
         println!("{} Checking dependencies...", "🔍".blue());
 
         let dependency = server.dependency();
@@ -143,7 +179,13 @@ impl InstallCommand {
             DependencyStatus::Installed { version } => {
                 Self::handle_installed_dependency(dep_name, version)
             }
-            DependencyStatus::Missing => Self::handle_missing_dependency(dep_name, &check),
+            DependencyStatus::Missing => {
+                if self.auto_install_deps {
+                    self.attempt_auto_install(dep_name, &check)
+                } else {
+                    Self::handle_missing_dependency(dep_name, &check)
+                }
+            }
             DependencyStatus::VersionMismatch {
                 installed,
                 required,
@@ -156,20 +198,130 @@ impl InstallCommand {
                     required
                 );
 
-                if let Some(instructions) = &check.install_instructions {
-                    return Err(McpError::version_mismatch(
+                if self.auto_install_deps {
+                    self.attempt_auto_install(dep_name, &check)
+                } else if let Some(instructions) = &check.install_instructions {
+                    Err(McpError::version_mismatch(
                         dep_name,
                         installed,
                         required,
                         instructions.clone(),
-                    ));
+                    ))
+                } else {
+                    Err(McpError::Other(anyhow::anyhow!(
+                        "Dependency {} version mismatch",
+                        dep_name
+                    )))
                 }
+            }
+            DependencyStatus::ConfigurationRequired { issue, solution } => {
+                println!(
+                    "  {} {} configuration issue: {}",
+                    "⚠".yellow(),
+                    dep_name,
+                    issue
+                );
+                println!("  {} Solution: {}", "💡".blue(), solution);
+
                 Err(McpError::Other(anyhow::anyhow!(
-                    "Dependency {} version mismatch",
-                    dep_name
+                    "Dependency {} requires configuration: {}. {}",
+                    dep_name,
+                    issue,
+                    solution
                 )))
             }
         }
+    }
+
+    fn attempt_auto_install(
+        &mut self,
+        dep_name: &str,
+        check: &crate::deps::DependencyCheck,
+    ) -> Result<()> {
+        println!(
+            "  {} Attempting to auto-install {}...",
+            "🚀".blue(),
+            dep_name
+        );
+
+        let mut installer = DependencyInstaller::new();
+        if self.dry_run {
+            installer = installer.with_dry_run();
+        }
+        if self.auto_install_deps {
+            installer = installer.with_auto_confirm();
+        }
+
+        // Show elevation warning if needed
+        if let Some(warning) = installer.get_elevation_warning(&check.dependency) {
+            println!("  {} {}", "⚠".yellow(), warning);
+        }
+
+        match installer.install_dependency(check) {
+            Ok(true) => {
+                println!("  {} Successfully installed {}", "✅".green(), dep_name);
+                Ok(())
+            }
+            Ok(false) => {
+                println!("  {} Could not auto-install {}", "⚠".yellow(), dep_name);
+                self.show_suggestions_for_dependency(dep_name, &check.dependency)?;
+                Self::handle_missing_dependency(dep_name, check)
+            }
+            Err(e) => {
+                println!("  {} Auto-installation failed: {}", "❌".red(), e);
+                self.show_suggestions_for_dependency(dep_name, &check.dependency)?;
+                Self::handle_missing_dependency(dep_name, check)
+            }
+        }
+    }
+
+    fn show_suggestions_for_dependency(
+        &mut self,
+        _dep_name: &str,
+        failed_dependency: &Dependency,
+    ) -> Result<()> {
+        println!("\n{} Looking for alternative servers...", "💡".blue());
+
+        let alternatives = self
+            .suggestions
+            .suggest_alternatives("unknown-server", Some(failed_dependency));
+
+        if alternatives.is_empty() {
+            println!("  {} No alternative servers found", "ℹ".blue());
+            return Ok(());
+        }
+
+        println!(
+            "  {} Found {} alternative server(s):",
+            "✨".green(),
+            alternatives.len()
+        );
+
+        for (i, suggestion) in alternatives.iter().enumerate() {
+            println!(
+                "    {}. {} - {}",
+                i + 1,
+                suggestion.server.name.cyan(),
+                suggestion.server.description
+            );
+            println!("       {} Reason: {}", "→".blue(), suggestion.reason);
+
+            let feasibility = self.suggestions.check_suggestion_feasibility(suggestion);
+            println!("       {} Status: {}", "🔍".blue(), feasibility);
+
+            if suggestion.server.verified {
+                println!("       {} Verified server", "✅".green());
+            }
+
+            println!(
+                "       {} Install: mcp install {}",
+                "📦".blue(),
+                suggestion.server.package_name
+            );
+            println!();
+        }
+
+        Ok(())
     }
 
     fn select_clients(&self) -> Result<Vec<String>> {

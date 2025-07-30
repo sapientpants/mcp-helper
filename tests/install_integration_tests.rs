@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 #[test]
 fn test_create_server_npm() {
-    let cmd = InstallCommand::new(false);
+    let mut cmd = InstallCommand::new(false);
 
     // Test NPM server creation through execute
     let result = cmd.execute("@test/nonexistent-package");
@@ -18,33 +18,40 @@ fn test_create_server_npm() {
 }
 
 #[test]
-fn test_create_server_binary_not_supported() {
-    let cmd = InstallCommand::new(false);
+fn test_create_server_binary_supported() {
+    let mut cmd = InstallCommand::new(false);
 
-    // Test binary server creation
+    // Test binary server creation (now supported in Phase 3)
     let result = cmd.execute("https://example.com/server.tar.gz");
-    assert!(result.is_err());
-
-    match result {
-        Err(McpError::ServerError { message, .. }) => {
-            assert!(message.contains("not yet supported"));
-        }
-        _ => panic!("Expected ServerError for unsupported binary server"),
+    // The command should work (though it might fail later due to missing clients or user interaction)
+    // What's important is that we don't get a "not yet supported" error
+    
+    if let Err(McpError::ServerError { message, .. }) = &result {
+        assert!(!message.contains("not yet supported"), 
+               "Binary should now be supported but got: {}", message);
     }
+    // Other error types are acceptable (missing clients, dependency issues, etc.)
 }
 
 #[test]
-fn test_create_server_python_not_supported() {
-    let cmd = InstallCommand::new(false);
+fn test_create_server_python_supported() {
+    let mut cmd = InstallCommand::new(false);
 
-    // Test Python server creation
+    // Test Python server creation (now supported in Phase 3)
     let result = cmd.execute("server.py");
-    assert!(result.is_err());
+    // The command should work (though it might fail later due to missing clients or user interaction)
+    // What's important is that we don't get a "not yet supported" error
+    
+    if let Err(McpError::ServerError { message, .. }) = &result {
+        assert!(!message.contains("not yet supported"), 
+               "Python should now be supported but got: {}", message);
+    }
+    // Other error types are acceptable (missing clients, dependency issues, etc.)
 }
 
 #[test]
 fn test_install_with_verbose() {
-    let cmd = InstallCommand::new(true);
+    let mut cmd = InstallCommand::new(true);
 
     // Test verbose mode
     let result = cmd.execute("@test/package");
@@ -53,7 +60,7 @@ fn test_install_with_verbose() {
 
 #[test]
 fn test_execute_empty_server_name() {
-    let cmd = InstallCommand::new(false);
+    let mut cmd = InstallCommand::new(false);
 
     let result = cmd.execute("");
     assert!(result.is_err());
@@ -61,7 +68,7 @@ fn test_execute_empty_server_name() {
 
 #[test]
 fn test_execute_with_version() {
-    let cmd = InstallCommand::new(false);
+    let mut cmd = InstallCommand::new(false);
 
     // Test package with version
     let result = cmd.execute("some-package@1.2.3");
@@ -120,7 +127,10 @@ fn test_get_dependency_name_coverage() {
         Dependency::Python {
             min_version: Some("3.8".to_string()),
         },
-        Dependency::Docker,
+        Dependency::Docker {
+            min_version: None,
+            requires_compose: false,
+        },
         Dependency::Git,
     ];
 
@@ -259,7 +269,7 @@ impl DependencyChecker for MockVersionMismatchChecker {
 
 #[test]
 fn test_check_dependencies_version_mismatch() {
-    let cmd = InstallCommand::new(false);
+    let mut cmd = InstallCommand::new(false);
     let _server = MockServer::new_with_version_mismatch();
 
     // Use reflection to call the private method

@@ -180,7 +180,7 @@ fn test_prompt_with_default_values() {
 
 #[test]
 fn test_execute_with_whitespace_server_name() {
-    let cmd = InstallCommand::new(false);
+    let mut cmd = InstallCommand::new(false);
 
     // Test server name with only whitespace
     let result = cmd.execute("   ");
@@ -193,7 +193,7 @@ fn test_execute_with_whitespace_server_name() {
 
 #[test]
 fn test_error_paths_for_uncovered_lines() {
-    let cmd = InstallCommand::new(true); // verbose mode
+    let mut cmd = InstallCommand::new(true); // verbose mode
 
     // Test various error conditions
     let error_cases = vec![
@@ -259,8 +259,8 @@ fn test_server_with_all_config_types() {
 
 #[test]
 fn test_verbose_mode_coverage() {
-    let cmd_verbose = InstallCommand::new(true);
-    let cmd_normal = InstallCommand::new(false);
+    let mut cmd_verbose = InstallCommand::new(true);
+    let mut cmd_normal = InstallCommand::new(false);
 
     // Both should handle the same error cases
     let test_input = "@nonexistent/package";

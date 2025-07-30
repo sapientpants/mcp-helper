@@ -31,7 +31,7 @@ fn test_detect_docker() {
     match detect_server_type("docker:ollama/ollama:latest") {
         ServerType::Docker { image, tag } => {
             assert_eq!(image, "ollama/ollama");
-            assert_eq!(tag, "latest");
+            assert_eq!(tag, Some("latest".to_string()));
         }
         _ => panic!("Expected Docker server type"),
     }
@@ -78,7 +78,7 @@ fn test_detect_docker_without_tag() {
     match detect_server_type("docker:nginx") {
         ServerType::Docker { image, tag } => {
             assert_eq!(image, "nginx");
-            assert_eq!(tag, "latest");
+            assert_eq!(tag, Some("latest".to_string()));
         }
         _ => panic!("Expected Docker server type"),
     }
@@ -296,7 +296,7 @@ fn test_detect_docker_with_complex_tag() {
     match detect_server_type("docker:user/repo:v1.2.3") {
         ServerType::Docker { image, tag } => {
             assert_eq!(image, "user/repo");
-            assert_eq!(tag, "v1.2.3");
+            assert_eq!(tag, Some("v1.2.3".to_string()));
         }
         _ => panic!("Expected Docker server type"),
     }

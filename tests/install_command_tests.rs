@@ -80,7 +80,10 @@ fn test_get_dependency_name() {
         "Python"
     );
     assert_eq!(
-        InstallCommand::get_dependency_name(&Dependency::Docker),
+        InstallCommand::get_dependency_name(&Dependency::Docker {
+            min_version: None,
+            requires_compose: false
+        }),
         "Docker"
     );
     assert_eq!(InstallCommand::get_dependency_name(&Dependency::Git), "Git");
@@ -99,7 +102,7 @@ fn test_handle_installed_dependency() {
 
 #[test]
 fn test_execute_with_binary_server() {
-    let cmd = InstallCommand::new(false);
+    let mut cmd = InstallCommand::new(false);
     // Binary servers are not yet supported
     let result = cmd.execute("https://example.com/binary.tar.gz");
     assert!(result.is_err());
@@ -169,7 +172,10 @@ fn test_handle_missing_dependency_with_instructions() {
 #[test]
 fn test_handle_missing_dependency_without_instructions() {
     let dep_check = DependencyCheck {
-        dependency: Dependency::Docker,
+        dependency: Dependency::Docker {
+            min_version: None,
+            requires_compose: false,
+        },
         status: DependencyStatus::Missing,
         install_instructions: None,
     };
@@ -186,7 +192,7 @@ fn test_handle_missing_dependency_without_instructions() {
 
 #[test]
 fn test_execute_no_clients() {
-    let cmd = InstallCommand::new(false);
+    let mut cmd = InstallCommand::new(false);
     let result = cmd.execute("@test/package");
 
     // Should fail because no clients are detected in test environment
@@ -195,7 +201,7 @@ fn test_execute_no_clients() {
 
 #[test]
 fn test_execute_npm_server() {
-    let cmd = InstallCommand::new(false);
+    let mut cmd = InstallCommand::new(false);
 
     // Test that NPM packages can be handled
     let result = cmd.execute("@scope/package");
