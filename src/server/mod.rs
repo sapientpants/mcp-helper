@@ -1,13 +1,21 @@
+pub mod binary;
+pub mod metadata;
 pub mod npm;
+pub mod python;
 
 use anyhow::Result;
 use std::collections::HashMap;
 
 use crate::deps::DependencyChecker;
 
+pub use binary::BinaryServer;
+pub use metadata::{
+    ExtendedServerMetadata, MetadataLoader, PlatformSupport, RegistryEntry, UsageExample,
+};
 pub use npm::NpmServer;
+pub use python::PythonServer;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ServerType {
     Npm {
         package: String,
@@ -36,7 +44,7 @@ pub struct ServerMetadata {
     pub optional_config: Vec<ConfigField>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ConfigField {
     pub name: String,
     pub field_type: ConfigFieldType,
@@ -44,7 +52,7 @@ pub struct ConfigField {
     pub default: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ConfigFieldType {
     String,
     Number,

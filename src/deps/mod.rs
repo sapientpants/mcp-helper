@@ -1,10 +1,12 @@
 pub mod node;
+pub mod python;
 pub mod version;
 
 use anyhow::Result;
 use std::fmt;
 
 pub use node::NodeChecker;
+pub use python::PythonChecker;
 pub use version::{VersionHelper, VersionRequirement};
 
 #[derive(Debug, Clone)]
