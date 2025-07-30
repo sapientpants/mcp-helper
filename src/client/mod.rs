@@ -16,7 +16,7 @@ pub use windsurf::WindsurfClient;
 
 use std::env;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ServerConfig {
     pub command: String,
     pub args: Vec<String>,

@@ -25,10 +25,12 @@ fn test_create_server_binary_supported() {
     let result = cmd.execute("https://example.com/server.tar.gz");
     // The command should work (though it might fail later due to missing clients or user interaction)
     // What's important is that we don't get a "not yet supported" error
-    
+
     if let Err(McpError::ServerError { message, .. }) = &result {
-        assert!(!message.contains("not yet supported"), 
-               "Binary should now be supported but got: {}", message);
+        assert!(
+            !message.contains("not yet supported"),
+            "Binary should now be supported but got: {message}"
+        );
     }
     // Other error types are acceptable (missing clients, dependency issues, etc.)
 }
@@ -41,10 +43,12 @@ fn test_create_server_python_supported() {
     let result = cmd.execute("server.py");
     // The command should work (though it might fail later due to missing clients or user interaction)
     // What's important is that we don't get a "not yet supported" error
-    
+
     if let Err(McpError::ServerError { message, .. }) = &result {
-        assert!(!message.contains("not yet supported"), 
-               "Python should now be supported but got: {}", message);
+        assert!(
+            !message.contains("not yet supported"),
+            "Python should now be supported but got: {message}"
+        );
     }
     // Other error types are acceptable (missing clients, dependency issues, etc.)
 }

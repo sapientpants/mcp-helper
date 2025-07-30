@@ -226,10 +226,12 @@ fn test_execute_with_python_server() {
     let result = cmd.execute("my_server.py");
     // The command should work (though it might fail later due to missing clients or user interaction)
     // What's important is that we don't get a "not yet supported" error
-    
+
     if let Err(McpError::ServerError { message, .. }) = &result {
-        assert!(!message.contains("not yet supported"), 
-               "Python should now be supported but got: {}", message);
+        assert!(
+            !message.contains("not yet supported"),
+            "Python should now be supported but got: {message}"
+        );
     }
     // Other error types are acceptable (missing clients, dependency issues, etc.)
 }
@@ -242,10 +244,12 @@ fn test_execute_with_binary_url() {
     let result = cmd.execute("https://github.com/org/repo/releases/download/v1.0.0/server.tar.gz");
     // The command should work (though it might fail later due to missing clients or user interaction)
     // What's important is that we don't get a "not yet supported" error
-    
+
     if let Err(McpError::ServerError { message, .. }) = &result {
-        assert!(!message.contains("not yet supported"), 
-               "Binary should now be supported but got: {}", message);
+        assert!(
+            !message.contains("not yet supported"),
+            "Binary should now be supported but got: {message}"
+        );
     }
     // Other error types are acceptable (missing clients, dependency issues, etc.)
 }

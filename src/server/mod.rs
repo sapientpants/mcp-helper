@@ -80,7 +80,10 @@ pub fn detect_server_type(package: &str) -> ServerType {
         let parts: Vec<&str> = stripped.splitn(2, ':').collect();
         ServerType::Docker {
             image: parts[0].to_string(),
-            tag: parts.get(1).map(|s| s.to_string()).or(Some("latest".to_string())),
+            tag: parts
+                .get(1)
+                .map(|s| s.to_string())
+                .or(Some("latest".to_string())),
         }
     } else if package.starts_with("https://") || package.starts_with("http://") {
         ServerType::Binary {

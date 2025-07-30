@@ -3,6 +3,7 @@ use dialoguer::{Confirm, Input};
 use std::collections::HashMap;
 
 use crate::client::{detect_clients, ClientRegistry, ServerConfig};
+use crate::config::ConfigManager;
 use crate::deps::{Dependency, DependencyInstaller, DependencyStatus};
 use crate::error::{McpError, Result};
 use crate::server::{
@@ -11,6 +12,7 @@ use crate::server::{
 
 pub struct InstallCommand {
     client_registry: ClientRegistry,
+    config_manager: ConfigManager,
     verbose: bool,
     auto_install_deps: bool,
     dry_run: bool,
@@ -28,6 +30,7 @@ impl InstallCommand {
 
         Self {
             client_registry,
+            config_manager: ConfigManager::new().expect("Failed to create config manager"),
             verbose,
             auto_install_deps: false,
             dry_run: false,
@@ -486,14 +489,22 @@ impl InstallCommand {
             config.insert(field.name.clone(), value);
         }
 
-        // Validate the configuration
-        server.validate_config(&config)?;
+        // Validate the configuration using ConfigManager
+        if let Err(validation_errors) = self.config_manager.validate_config(server, &config) {
+            for error in &validation_errors {
+                eprintln!("  {} {}", "✗".red(), error);
+            }
+            return Err(McpError::Other(anyhow::anyhow!(
+                "Configuration validation failed with {} error(s)",
+                validation_errors.len()
+            )));
+        }
 
         Ok(config)
     }
 
     fn install_to_client(
-        &self,
+        &mut self,
         client_name: &str,
         server_name: &str,
         config: &HashMap<String, String>,
@@ -527,9 +538,26 @@ impl InstallCommand {
             env: config.clone(),
         };
 
-        client.add_server(server_name, server_config)?;
-
-        println!("  {} Installed to {}", "✓".green(), client_name);
+        // Use ConfigManager to apply configuration with automatic backup
+        match self
+            .config_manager
+            .apply_config(client, server_name, server_config)
+        {
+            Ok(snapshot) => {
+                println!("  {} Installed to {}", "✓".green(), client_name);
+                if self.verbose {
+                    println!(
+                        "  {} Configuration snapshot saved: {}",
+                        "ℹ".blue(),
+                        snapshot.timestamp.format("%Y-%m-%d %H:%M:%S")
+                    );
+                }
+            }
+            Err(e) => {
+                eprintln!("  {} Installation failed: {}", "✗".red(), e);
+                return Err(e.into());
+            }
+        }
 
         Ok(())
     }

@@ -186,12 +186,14 @@ fn test_create_server_docker_supported() {
     let result = cmd.execute("docker:redis:latest");
     // The command should work (though it might fail later due to missing clients or user interaction)
     // What's important is that we don't get a "not yet supported" error
-    
+
     // The result can be Ok (if user selects clients) or Err for other reasons
     // but shouldn't be a "not yet supported" error
     if let Err(McpError::ServerError { message, .. }) = &result {
-        assert!(!message.contains("not yet supported"), 
-               "Docker should now be supported but got: {}", message);
+        assert!(
+            !message.contains("not yet supported"),
+            "Docker should now be supported but got: {message}"
+        );
     }
     // Other error types (like missing clients, dependency issues, etc.) are acceptable
 }
