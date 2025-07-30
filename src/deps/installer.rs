@@ -390,9 +390,11 @@ mod tests {
         assert!(result.is_ok());
 
         // Should prefer package manager over download on supported platforms
-        let selected = result.unwrap();
         #[cfg(target_os = "macos")]
-        assert_eq!(selected.name, "homebrew");
+        {
+            let selected = result.unwrap();
+            assert_eq!(selected.name, "homebrew");
+        }
     }
 
     #[test]
