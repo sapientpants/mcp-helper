@@ -3,7 +3,9 @@ pub mod config;
 pub mod deps;
 pub mod error;
 pub mod install;
+pub mod logging;
 pub mod runner;
+pub mod security;
 pub mod server;
 
 // Re-export Platform enum so it can be used in tests

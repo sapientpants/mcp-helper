@@ -2,6 +2,7 @@ use crate::deps::{
     get_install_instructions, version::VersionHelper, Dependency, DependencyCheck,
     DependencyChecker, DependencyStatus,
 };
+use crate::logging;
 use anyhow::{Context, Result};
 use std::process::Command;
 use which::which;
@@ -94,8 +95,12 @@ impl DependencyChecker for NodeChecker {
         };
 
         let node_cmd = match Self::check_node_command() {
-            Some(cmd) => cmd,
+            Some(cmd) => {
+                tracing::debug!("Found Node.js command: {}", cmd);
+                cmd
+            }
             None => {
+                logging::log_dependency_check("Node.js", "missing");
                 return Ok(DependencyCheck {
                     dependency: dependency.clone(),
                     status: DependencyStatus::Missing,
@@ -119,14 +124,36 @@ impl DependencyChecker for NodeChecker {
         // Compare versions if required
         let status = self.compare_versions(&version)?;
 
+        // Log the dependency check result
+        match &status {
+            DependencyStatus::Installed { version } => {
+                let version_str = version.as_deref().unwrap_or("unknown");
+                logging::log_dependency_check("Node.js", &format!("installed ({version_str})"));
+            }
+            DependencyStatus::VersionMismatch {
+                installed,
+                required,
+            } => {
+                logging::log_dependency_check(
+                    "Node.js",
+                    &format!("version mismatch ({installed} < {required})"),
+                );
+            }
+            _ => {
+                logging::log_dependency_check("Node.js", "missing or invalid");
+            }
+        }
+
         // For version mismatches or missing NPX, provide install instructions
         let install_instructions = match &status {
             DependencyStatus::VersionMismatch { .. } => Some(get_install_instructions(&dependency)),
             DependencyStatus::Installed { .. } => {
                 // Also check if npx is available
                 if !Self::check_npx_available() {
+                    tracing::warn!("Node.js installed but npx not available");
                     Some(get_install_instructions(&dependency))
                 } else {
+                    tracing::debug!("Node.js and npx both available");
                     None
                 }
             }

@@ -7,6 +7,8 @@ use crate::client::{detect_clients, ClientRegistry, ServerConfig};
 use crate::config::ConfigManager;
 use crate::deps::{Dependency, DependencyInstaller, DependencyStatus};
 use crate::error::{McpError, Result};
+use crate::logging;
+use crate::security::SecurityValidator;
 use crate::server::{
     detect_server_type, ConfigField, ConfigFieldType, McpServer, ServerSuggestions, ServerType,
 };
@@ -14,6 +16,7 @@ use crate::server::{
 pub struct InstallCommand {
     client_registry: ClientRegistry,
     config_manager: ConfigManager,
+    security_validator: SecurityValidator,
     verbose: bool,
     auto_install_deps: bool,
     dry_run: bool,
@@ -33,6 +36,7 @@ impl InstallCommand {
         Self {
             client_registry,
             config_manager: ConfigManager::new().expect("Failed to create config manager"),
+            security_validator: SecurityValidator::new(),
             verbose,
             auto_install_deps: false,
             dry_run: false,
@@ -79,6 +83,9 @@ impl InstallCommand {
             eprintln!("{} Detecting server type for: {}", "ℹ".blue(), server_name);
         }
 
+        // Validate server source security
+        self.validate_server_security(server_name)?;
+
         // Parse server argument and detect type
         let server_type = detect_server_type(server_name);
 
@@ -104,6 +111,15 @@ impl InstallCommand {
         for client_name in &clients {
             self.install_to_client(client_name, server_name, &config)?;
         }
+
+        // Log successful server installation
+        let server_type_name = match server_type {
+            ServerType::Npm { .. } => "npm",
+            ServerType::Binary { .. } => "binary",
+            ServerType::Python { .. } => "python",
+            ServerType::Docker { .. } => "docker",
+        };
+        logging::log_server_installation(server_name, server_type_name, true);
 
         println!(
             "\n{} Successfully installed {} to {} client(s)",
@@ -223,6 +239,79 @@ impl InstallCommand {
         }
 
         Ok(servers)
+    }
+
+    fn validate_server_security(&self, server_name: &str) -> Result<()> {
+        let validation =
+            if server_name.starts_with("http://") || server_name.starts_with("https://") {
+                // Direct URL
+                self.security_validator.validate_url(server_name)?
+            } else if server_name.starts_with("docker:") {
+                // Docker image
+                let image_name = server_name.strip_prefix("docker:").unwrap_or(server_name);
+                self.security_validator.validate_docker_image(image_name)?
+            } else if server_name.contains('/') && !server_name.starts_with('@') {
+                // Likely a GitHub repo or similar
+                let url = if server_name.starts_with("github.com/") {
+                    format!("https://{server_name}")
+                } else {
+                    format!("https://github.com/{server_name}")
+                };
+                self.security_validator.validate_url(&url)?
+            } else {
+                // NPM package
+                self.security_validator.validate_npm_package(server_name)?
+            };
+
+        // Log security check
+        tracing::info!(
+            server = server_name,
+            is_trusted = validation.is_trusted,
+            is_https = validation.is_https,
+            domain = validation.domain.as_deref().unwrap_or("unknown"),
+            "Security validation completed"
+        );
+
+        // Handle warnings
+        if !validation.warnings.is_empty() {
+            println!(
+                "{} {}",
+                "⚠".yellow(),
+                "Security warnings detected:".yellow()
+            );
+            for warning in &validation.warnings {
+                println!("  {} {}", "•".yellow(), warning);
+            }
+
+            // Block if validation says we should
+            if validation.should_block() {
+                return Err(McpError::Other(anyhow::anyhow!(
+                    "Installation blocked due to security concerns. Use --force to override (if available)."
+                )));
+            }
+
+            // Prompt user for non-blocking warnings
+            if !validation.is_safe() && !self.dry_run {
+                println!();
+                let proceed = Confirm::new()
+                    .with_prompt("Do you want to proceed despite these warnings?")
+                    .default(false)
+                    .interact()
+                    .map_err(|e| {
+                        McpError::Other(anyhow::anyhow!("Failed to read user input: {}", e))
+                    })?;
+
+                if !proceed {
+                    return Err(McpError::Other(anyhow::anyhow!(
+                        "Installation cancelled by user due to security warnings."
+                    )));
+                }
+            }
+        } else if self.verbose {
+            println!("{} Security validation passed", "✓".green());
+        }
+
+        Ok(())
     }
 
     fn create_server(&self, server_type: &ServerType) -> Result<Box<dyn McpServer>> {
@@ -720,6 +809,7 @@ impl InstallCommand {
             .apply_config(client, server_name, server_config)
         {
             Ok(snapshot) => {
+                logging::log_config_change(client_name, server_name, "add");
                 println!("  {} Installed to {}", "✓".green(), client_name);
                 if self.verbose {
                     println!(

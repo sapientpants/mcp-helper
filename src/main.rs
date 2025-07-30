@@ -10,6 +10,7 @@ use runner::Platform;
 // Import from mcp_helper lib
 use mcp_helper::error::McpError;
 use mcp_helper::install::InstallCommand;
+use mcp_helper::logging;
 
 #[derive(Parser)]
 #[command(name = "mcp")]
@@ -95,7 +96,14 @@ fn print_not_implemented(command: &str) {
 fn main() {
     let cli = Cli::parse();
 
+    // Initialize logging based on verbosity
+    if let Err(e) = logging::init_logging(cli.verbose) {
+        eprintln!("Warning: Failed to initialize logging: {e}");
+    }
+
+    // Log system information in verbose mode
     if cli.verbose {
+        logging::log_system_info();
         eprintln!("{}", "Verbose mode enabled".dimmed());
     }
 
