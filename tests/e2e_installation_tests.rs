@@ -57,7 +57,11 @@ fn test_end_to_end_npm_server_installation() {
     // Simulate the full installation flow
     let config = ServerConfig {
         command: "npx".to_string(),
-        args: vec!["--yes".to_string(), "test-server".to_string(), "--stdio".to_string()],
+        args: vec![
+            "--yes".to_string(),
+            "test-server".to_string(),
+            "--stdio".to_string(),
+        ],
         env: {
             let mut env = HashMap::new();
             env.insert("API_KEY".to_string(), "test123".to_string());
@@ -93,11 +97,18 @@ fn test_end_to_end_docker_server_installation() {
     // Test Docker server installation
     let config = ServerConfig {
         command: "docker".to_string(),
-        args: vec!["run".to_string(), "--rm".to_string(), "nginx:alpine".to_string()],
+        args: vec![
+            "run".to_string(),
+            "--rm".to_string(),
+            "nginx:alpine".to_string(),
+        ],
         env: {
             let mut env = HashMap::new();
             env.insert("ports".to_string(), "8080:80".to_string());
-            env.insert("environment".to_string(), "NGINX_HOST=localhost".to_string());
+            env.insert(
+                "environment".to_string(),
+                "NGINX_HOST=localhost".to_string(),
+            );
             env
         },
     };
@@ -121,7 +132,7 @@ fn test_end_to_end_configuration_management() {
     std::env::set_var("XDG_DATA_HOME", &unique_path);
 
     let config_manager = ConfigManager::new().unwrap();
-    
+
     let client = MockClient {
         name: "config-client".to_string(),
         servers: Arc::new(Mutex::new(HashMap::new())),
@@ -176,7 +187,9 @@ fn test_end_to_end_configuration_management() {
     // Verify rollback worked
     let servers_after_rollback = client.list_servers().unwrap();
     assert_eq!(servers_after_rollback["config-server"].env["PORT"], "3000");
-    assert!(!servers_after_rollback["config-server"].env.contains_key("DEBUG"));
+    assert!(!servers_after_rollback["config-server"]
+        .env
+        .contains_key("DEBUG"));
 }
 
 #[test]
@@ -210,7 +223,7 @@ workers=4
 
     // Test parsing the batch file via InstallCommand
     let batch_content_read = fs::read_to_string(&batch_file).unwrap();
-    
+
     // This simulates what InstallCommand::parse_batch_file does
     let mut servers = HashMap::new();
     let mut current_server: Option<String> = None;
@@ -278,13 +291,13 @@ fn test_end_to_end_non_interactive_installation() {
     // Test the CLI with non-interactive flags
     let temp_dir = TempDir::new().unwrap();
     let batch_file = temp_dir.path().join("cli_test.conf");
-    
+
     let batch_content = r#"
 [test-server]
 api_key=cli_test_key
 port=9000
 "#;
-    
+
     fs::write(&batch_file, batch_content).unwrap();
 
     // Test CLI with batch file
@@ -297,7 +310,7 @@ port=9000
 
     let output = cmd.output().unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout);
-    
+
     // Should detect the server in batch mode
     assert!(stdout.contains("Found") || stdout.contains("1") || stdout.contains("server"));
 }
@@ -319,19 +332,19 @@ fn test_end_to_end_config_flag_installation() {
     let output = cmd.output().unwrap();
     let stderr = String::from_utf8_lossy(&output.stderr);
     let stdout = String::from_utf8_lossy(&output.stdout);
-    
+
     // Should run in non-interactive mode
     assert!(
-        stderr.contains("non-interactive") || 
-        stdout.contains("Installing") || 
-        stderr.contains("override")
+        stderr.contains("non-interactive")
+            || stdout.contains("Installing")
+            || stderr.contains("override")
     );
 }
 
 #[test]
 fn test_end_to_end_error_handling() {
     // Test various error conditions in the installation flow
-    
+
     // Test with invalid config format
     let mut cmd = Command::cargo_bin("mcp").unwrap();
     cmd.arg("install")
@@ -342,7 +355,7 @@ fn test_end_to_end_error_handling() {
 
     let output = cmd.output().unwrap();
     let stderr = String::from_utf8_lossy(&output.stderr);
-    
+
     // Should warn about invalid format
     assert!(stderr.contains("Invalid config format") || stderr.contains("Expected key=value"));
 
@@ -367,7 +380,7 @@ fn test_end_to_end_history_and_rollback() {
     std::env::set_var("XDG_DATA_HOME", &unique_path);
 
     let config_manager = ConfigManager::new().unwrap();
-    
+
     let client = MockClient {
         name: "history-client".to_string(),
         servers: Arc::new(Mutex::new(HashMap::new())),
@@ -407,7 +420,7 @@ fn test_end_to_end_history_and_rollback() {
         .unwrap();
 
     assert_eq!(history.len(), 3);
-    
+
     // History should be sorted by timestamp (newest first)
     for i in 0..history.len() - 1 {
         assert!(history[i].timestamp >= history[i + 1].timestamp);
@@ -444,7 +457,11 @@ fn test_end_to_end_comprehensive_workflow() {
     // Step 1: Initial installation via CLI simulation
     let initial_servers = vec![
         ("npm-server", "npx", vec!["--yes", "some-package"]),
-        ("docker-server", "docker", vec!["run", "--rm", "nginx:alpine"]),
+        (
+            "docker-server",
+            "docker",
+            vec!["run", "--rm", "nginx:alpine"],
+        ),
     ];
 
     let client = MockClient {
@@ -473,10 +490,14 @@ fn test_end_to_end_comprehensive_workflow() {
 
     // Step 4: Test configuration management
     let config_manager = ConfigManager::new().unwrap();
-    
+
     let enhanced_config = ServerConfig {
         command: "npx".to_string(),
-        args: vec!["--yes".to_string(), "some-package".to_string(), "--verbose".to_string()],
+        args: vec![
+            "--yes".to_string(),
+            "some-package".to_string(),
+            "--verbose".to_string(),
+        ],
         env: {
             let mut env = HashMap::new();
             env.insert("NODE_ENV".to_string(), "production".to_string());
@@ -491,7 +512,9 @@ fn test_end_to_end_comprehensive_workflow() {
 
     // Step 5: Verify enhanced configuration
     let updated_servers = client.list_servers().unwrap();
-    assert!(updated_servers["npm-server"].args.contains(&"--verbose".to_string()));
+    assert!(updated_servers["npm-server"]
+        .args
+        .contains(&"--verbose".to_string()));
     assert!(updated_servers["npm-server"].env.contains_key("NODE_ENV"));
 
     // Step 6: Test rollback capability
@@ -500,8 +523,12 @@ fn test_end_to_end_comprehensive_workflow() {
         assert!(rollback_result.is_ok());
 
         let rolled_back_servers = client.list_servers().unwrap();
-        assert!(!rolled_back_servers["npm-server"].args.contains(&"--verbose".to_string()));
-        assert!(!rolled_back_servers["npm-server"].env.contains_key("NODE_ENV"));
+        assert!(!rolled_back_servers["npm-server"]
+            .args
+            .contains(&"--verbose".to_string()));
+        assert!(!rolled_back_servers["npm-server"]
+            .env
+            .contains_key("NODE_ENV"));
     }
 
     // Step 7: Verify final state

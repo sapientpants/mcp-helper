@@ -40,7 +40,9 @@ impl McpClient for MockClient {
 #[test]
 fn test_config_snapshot_creation() {
     let temp_dir = TempDir::new().unwrap();
-    let unique_path = temp_dir.path().join(format!("snapshot_test_{}", std::process::id()));
+    let unique_path = temp_dir
+        .path()
+        .join(format!("snapshot_test_{}", std::process::id()));
     std::fs::create_dir_all(&unique_path).unwrap();
     std::env::set_var("XDG_DATA_HOME", &unique_path);
 
@@ -76,7 +78,9 @@ fn test_config_snapshot_creation() {
 #[test]
 fn test_config_rollback_with_previous_config() {
     let temp_dir = TempDir::new().unwrap();
-    let unique_path = temp_dir.path().join(format!("rollback_test_{}", std::process::id()));
+    let unique_path = temp_dir
+        .path()
+        .join(format!("rollback_test_{}", std::process::id()));
     std::fs::create_dir_all(&unique_path).unwrap();
     std::env::set_var("XDG_DATA_HOME", &unique_path);
 
@@ -122,7 +126,9 @@ fn test_config_rollback_with_previous_config() {
 #[test]
 fn test_config_rollback_without_previous_config() {
     let temp_dir = TempDir::new().unwrap();
-    let unique_path = temp_dir.path().join(format!("no_previous_test_{}", std::process::id()));
+    let unique_path = temp_dir
+        .path()
+        .join(format!("no_previous_test_{}", std::process::id()));
     std::fs::create_dir_all(&unique_path).unwrap();
     std::env::set_var("XDG_DATA_HOME", &unique_path);
 
@@ -135,7 +141,7 @@ fn test_config_rollback_without_previous_config() {
 
     let config = ServerConfig {
         command: "deno".to_string(),
-        args: vec!["run", "server.ts"].iter().map(|s| s.to_string()).collect(),
+        args: ["run", "server.ts"].iter().map(|s| s.to_string()).collect(),
         env: HashMap::new(),
     };
 
@@ -146,13 +152,18 @@ fn test_config_rollback_without_previous_config() {
     // This should fail because there's no previous config to rollback to
     let result = manager.rollback(&client, &snapshot);
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("no previous configuration"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("no previous configuration"));
 }
 
 #[test]
 fn test_config_history_tracking() {
     let temp_dir = TempDir::new().unwrap();
-    let unique_path = temp_dir.path().join(format!("history_test_{}", std::process::id()));
+    let unique_path = temp_dir
+        .path()
+        .join(format!("history_test_{}", std::process::id()));
     std::fs::create_dir_all(&unique_path).unwrap();
     std::env::set_var("XDG_DATA_HOME", &unique_path);
 
@@ -182,7 +193,7 @@ fn test_config_history_tracking() {
         .unwrap();
 
     assert_eq!(history.len(), 3);
-    
+
     // History should be sorted by timestamp (newest first)
     for i in 0..history.len() - 1 {
         assert!(history[i].timestamp >= history[i + 1].timestamp);
@@ -192,7 +203,9 @@ fn test_config_history_tracking() {
 #[test]
 fn test_config_diff_functionality() {
     let temp_dir = TempDir::new().unwrap();
-    let unique_path = temp_dir.path().join(format!("diff_test_{}", std::process::id()));
+    let unique_path = temp_dir
+        .path()
+        .join(format!("diff_test_{}", std::process::id()));
     std::fs::create_dir_all(&unique_path).unwrap();
     std::env::set_var("XDG_DATA_HOME", &unique_path);
 
@@ -224,20 +237,24 @@ fn test_config_diff_functionality() {
 
     // Should detect command change
     assert!(diffs.iter().any(|d| d.contains("Command: node → deno")));
-    
+
     // Should detect args change
     assert!(diffs.iter().any(|d| d.contains("Arguments:")));
-    
+
     // Should detect env var changes
     assert!(diffs.iter().any(|d| d.contains("Modified env var PORT")));
-    assert!(diffs.iter().any(|d| d.contains("Added env var: PRODUCTION=true")));
+    assert!(diffs
+        .iter()
+        .any(|d| d.contains("Added env var: PRODUCTION=true")));
     assert!(diffs.iter().any(|d| d.contains("Removed env var: DEBUG")));
 }
 
 #[test]
 fn test_config_history_cleanup() {
     let temp_dir = TempDir::new().unwrap();
-    let unique_path = temp_dir.path().join(format!("cleanup_test_{}", std::process::id()));
+    let unique_path = temp_dir
+        .path()
+        .join(format!("cleanup_test_{}", std::process::id()));
     std::fs::create_dir_all(&unique_path).unwrap();
     std::env::set_var("XDG_DATA_HOME", &unique_path);
 
@@ -268,7 +285,7 @@ fn test_config_history_cleanup() {
 
     // Should not exceed max history entries (10)
     assert!(history.len() <= 10);
-    
+
     // Should keep the most recent entries
     // The newest entry should have the highest server number
     if let Some(newest) = history.first() {
@@ -279,7 +296,9 @@ fn test_config_history_cleanup() {
 #[test]
 fn test_latest_snapshot_retrieval() {
     let temp_dir = TempDir::new().unwrap();
-    let unique_path = temp_dir.path().join(format!("latest_test_{}", std::process::id()));
+    let unique_path = temp_dir
+        .path()
+        .join(format!("latest_test_{}", std::process::id()));
     std::fs::create_dir_all(&unique_path).unwrap();
     std::env::set_var("XDG_DATA_HOME", &unique_path);
 

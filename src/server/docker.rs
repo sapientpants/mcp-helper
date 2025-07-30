@@ -148,30 +148,39 @@ impl DockerServer {
     }
 
     fn parse_volumes(&self, volumes_str: &str) -> Vec<String> {
-        volumes_str
-            .split(',')
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-            .map(|v| format!("--volume={v}"))
-            .collect()
+        let mut result = Vec::new();
+        for volume in volumes_str.split(',') {
+            let volume = volume.trim();
+            if !volume.is_empty() {
+                result.push("-v".to_string());
+                result.push(volume.to_string());
+            }
+        }
+        result
     }
 
     fn parse_environment(&self, env_str: &str) -> Vec<String> {
-        env_str
-            .split(',')
-            .map(|e| e.trim())
-            .filter(|e| !e.is_empty() && e.contains('='))
-            .map(|e| format!("--env={e}"))
-            .collect()
+        let mut result = Vec::new();
+        for env_var in env_str.split(',') {
+            let env_var = env_var.trim();
+            if !env_var.is_empty() && env_var.contains('=') {
+                result.push("-e".to_string());
+                result.push(env_var.to_string());
+            }
+        }
+        result
     }
 
     fn parse_ports(&self, ports_str: &str) -> Vec<String> {
-        ports_str
-            .split(',')
-            .map(|p| p.trim())
-            .filter(|p| !p.is_empty())
-            .map(|p| format!("--publish={p}"))
-            .collect()
+        let mut result = Vec::new();
+        for port in ports_str.split(',') {
+            let port = port.trim();
+            if !port.is_empty() {
+                result.push("-p".to_string());
+                result.push(port.to_string());
+            }
+        }
+        result
     }
 
     fn generate_container_name(&self) -> String {
@@ -346,14 +355,12 @@ impl DockerServer {
 
         // Add memory limit
         if let Some(memory_limit) = config.get("memory_limit") {
-            args.push("--memory".to_string());
-            args.push(memory_limit.clone());
+            args.push(format!("--memory={memory_limit}"));
         }
 
         // Add CPU limit
         if let Some(cpu_limit) = config.get("cpu_limit") {
-            args.push("--cpus".to_string());
-            args.push(cpu_limit.clone());
+            args.push(format!("--cpus={cpu_limit}"));
         }
 
         // Add working directory
@@ -445,10 +452,7 @@ mod tests {
         let volumes = server.parse_volumes("/host/path:/container/path,/another:/path");
         assert_eq!(
             volumes,
-            vec![
-                "--volume=/host/path:/container/path",
-                "--volume=/another:/path"
-            ]
+            vec!["-v", "/host/path:/container/path", "-v", "/another:/path"]
         );
     }
 
@@ -456,14 +460,14 @@ mod tests {
     fn test_parse_environment() {
         let server = DockerServer::new("nginx").unwrap();
         let env_vars = server.parse_environment("KEY1=value1,KEY2=value2");
-        assert_eq!(env_vars, vec!["--env=KEY1=value1", "--env=KEY2=value2"]);
+        assert_eq!(env_vars, vec!["-e", "KEY1=value1", "-e", "KEY2=value2"]);
     }
 
     #[test]
     fn test_parse_ports() {
         let server = DockerServer::new("nginx").unwrap();
         let ports = server.parse_ports("8080:80,8443:443");
-        assert_eq!(ports, vec!["--publish=8080:80", "--publish=8443:443"]);
+        assert_eq!(ports, vec!["-p", "8080:80", "-p", "8443:443"]);
     }
 
     #[test]
@@ -544,8 +548,23 @@ mod tests {
         let (cmd, args) = server.generate_command_with_config(&config).unwrap();
 
         assert_eq!(cmd, "docker");
-        assert!(args.contains(&"--volume=/host:/container".to_string()));
-        assert!(args.contains(&"--env=KEY=value".to_string()));
-        assert!(args.contains(&"--publish=8080:80".to_string()));
+
+        // Check for volume arguments (should appear as separate -v flag and value)
+        let volume_index = args.iter().position(|arg| arg == "-v");
+        assert!(volume_index.is_some());
+        let volume_index = volume_index.unwrap();
+        assert_eq!(args[volume_index + 1], "/host:/container");
+
+        // Check for environment arguments (should appear as separate -e flag and value)
+        let env_index = args.iter().position(|arg| arg == "-e");
+        assert!(env_index.is_some());
+        let env_index = env_index.unwrap();
+        assert_eq!(args[env_index + 1], "KEY=value");
+
+        // Check for port arguments (should appear as separate -p flag and value)
+        let port_index = args.iter().position(|arg| arg == "-p");
+        assert!(port_index.is_some());
+        let port_index = port_index.unwrap();
+        assert_eq!(args[port_index + 1], "8080:80");
     }
 }

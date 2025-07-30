@@ -39,13 +39,17 @@ impl McpClient for MockClient {
 
 fn create_isolated_config_manager() -> (ConfigManager, TempDir) {
     let temp_dir = TempDir::new().unwrap();
-    let unique_id = format!("test_{}_{:?}", std::process::id(), std::thread::current().id());
+    let unique_id = format!(
+        "test_{}_{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    );
     let test_path = temp_dir.path().join(unique_id);
     std::fs::create_dir_all(&test_path).unwrap();
-    
+
     // Set the environment variable for this test
     std::env::set_var("XDG_DATA_HOME", &test_path);
-    
+
     let manager = ConfigManager::new().unwrap();
     (manager, temp_dir)
 }
@@ -53,7 +57,7 @@ fn create_isolated_config_manager() -> (ConfigManager, TempDir) {
 #[test]
 fn test_simple_config_snapshot_creation() {
     let (manager, _temp_dir) = create_isolated_config_manager();
-    
+
     let client = MockClient {
         name: "test-client".to_string(),
         servers: Arc::new(Mutex::new(HashMap::new())),
@@ -84,7 +88,7 @@ fn test_simple_config_snapshot_creation() {
 #[test]
 fn test_simple_config_rollback() {
     let (manager, _temp_dir) = create_isolated_config_manager();
-    
+
     let client = MockClient {
         name: "rollback-client".to_string(),
         servers: Arc::new(Mutex::new(HashMap::new())),
@@ -125,7 +129,7 @@ fn test_simple_config_rollback() {
 #[test]
 fn test_simple_config_history() {
     let (manager, _temp_dir) = create_isolated_config_manager();
-    
+
     let client = MockClient {
         name: "history-client".to_string(),
         servers: Arc::new(Mutex::new(HashMap::new())),
@@ -150,7 +154,7 @@ fn test_simple_config_history() {
         .unwrap();
 
     assert_eq!(history.len(), 3);
-    
+
     // History should be sorted by timestamp (newest first)
     for i in 0..history.len() - 1 {
         assert!(history[i].timestamp >= history[i + 1].timestamp);
@@ -187,20 +191,22 @@ fn test_simple_config_diff() {
 
     // Should detect command change
     assert!(diffs.iter().any(|d| d.contains("Command: node → deno")));
-    
+
     // Should detect args change
     assert!(diffs.iter().any(|d| d.contains("Arguments:")));
-    
+
     // Should detect env var changes
     assert!(diffs.iter().any(|d| d.contains("Modified env var PORT")));
-    assert!(diffs.iter().any(|d| d.contains("Added env var: PRODUCTION=true")));
+    assert!(diffs
+        .iter()
+        .any(|d| d.contains("Added env var: PRODUCTION=true")));
     assert!(diffs.iter().any(|d| d.contains("Removed env var: DEBUG")));
 }
 
 #[test]
 fn test_simple_latest_snapshot() {
     let (manager, _temp_dir) = create_isolated_config_manager();
-    
+
     let client = MockClient {
         name: "latest-client".to_string(),
         servers: Arc::new(Mutex::new(HashMap::new())),
