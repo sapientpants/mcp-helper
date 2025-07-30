@@ -348,7 +348,7 @@ mod tests {
     #[test]
     fn test_dependency_check_structure() {
         let checker = DockerChecker::new();
-        
+
         // Test the structure without actually checking Docker availability
         let dependency = Dependency::Docker {
             min_version: checker.min_version.clone(),
@@ -396,10 +396,13 @@ mod tests {
         // Test that we can create a checker and it has expected defaults
         assert!(checker.min_version.is_none());
         assert!(!checker.check_compose);
-        
+
         // Test with version requirement
         let checker_with_version = DockerChecker::with_min_version("20.10.0");
-        assert_eq!(checker_with_version.min_version, Some("20.10.0".to_string()));
+        assert_eq!(
+            checker_with_version.min_version,
+            Some("20.10.0".to_string())
+        );
     }
 
     #[test]
@@ -415,7 +418,7 @@ mod tests {
     #[test]
     fn test_compose_checker_structure() {
         let checker = DockerChecker::new().with_compose_check();
-        
+
         // Test the structure without actually checking Docker availability
         let dependency = Dependency::Docker {
             min_version: checker.min_version.clone(),
