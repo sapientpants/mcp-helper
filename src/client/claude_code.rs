@@ -1,8 +1,10 @@
-use crate::client::{HomeDirectoryProvider, McpClient, RealHomeDirectoryProvider, ServerConfig};
+use crate::client::{
+    get_home_with_fallback, HomeDirectoryProvider, McpClient, RealHomeDirectoryProvider,
+    ServerConfig,
+};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tempfile::NamedTempFile;
@@ -43,21 +45,7 @@ impl McpClient for ClaudeCodeClient {
 
     fn config_path(&self) -> PathBuf {
         // Claude Code uses ~/.claude.json for user MCP servers
-        let home = self.home_provider.home_dir().unwrap_or_else(|| {
-            // Fallback to environment variables if home dir can't be determined
-            #[cfg(windows)]
-            {
-                PathBuf::from(
-                    env::var("USERPROFILE")
-                        .unwrap_or_else(|_| env::var("HOME").unwrap_or_else(|_| ".".to_string())),
-                )
-            }
-            #[cfg(not(windows))]
-            {
-                PathBuf::from(env::var("HOME").unwrap_or_else(|_| ".".to_string()))
-            }
-        });
-        home.join(".claude.json")
+        get_home_with_fallback(&*self.home_provider).join(".claude.json")
     }
 
     fn is_installed(&self) -> bool {

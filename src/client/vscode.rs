@@ -1,8 +1,10 @@
-use crate::client::{HomeDirectoryProvider, McpClient, RealHomeDirectoryProvider, ServerConfig};
+use crate::client::{
+    get_home_with_fallback, HomeDirectoryProvider, McpClient, RealHomeDirectoryProvider,
+    ServerConfig,
+};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tempfile::NamedTempFile;
@@ -40,20 +42,7 @@ impl Default for VSCodeClient {
 impl VSCodeClient {
     /// Get home directory with fallback
     fn get_home_directory(&self) -> PathBuf {
-        self.home_provider.home_dir().unwrap_or_else(|| {
-            // Fallback to environment variables if home dir can't be determined
-            #[cfg(windows)]
-            {
-                PathBuf::from(
-                    env::var("USERPROFILE")
-                        .unwrap_or_else(|_| env::var("HOME").unwrap_or_else(|_| ".".to_string())),
-                )
-            }
-            #[cfg(not(windows))]
-            {
-                PathBuf::from(env::var("HOME").unwrap_or_else(|_| ".".to_string()))
-            }
-        })
+        get_home_with_fallback(&*self.home_provider)
     }
 
     /// Get VS Code extension directories

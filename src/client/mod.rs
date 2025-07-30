@@ -14,6 +14,8 @@ pub use cursor::CursorClient;
 pub use vscode::VSCodeClient;
 pub use windsurf::WindsurfClient;
 
+use std::env;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ServerConfig {
     pub command: String,
@@ -104,6 +106,25 @@ impl HomeDirectoryProvider for MockHomeDirectoryProvider {
     fn home_dir(&self) -> Option<PathBuf> {
         Some(self.home_path.clone())
     }
+}
+
+/// Get home directory with environment variable fallback
+/// This provides a common fallback mechanism when the home directory provider returns None
+pub fn get_home_with_fallback(provider: &dyn HomeDirectoryProvider) -> PathBuf {
+    provider.home_dir().unwrap_or_else(|| {
+        // Fallback to environment variables if home dir can't be determined
+        #[cfg(windows)]
+        {
+            PathBuf::from(
+                env::var("USERPROFILE")
+                    .unwrap_or_else(|_| env::var("HOME").unwrap_or_else(|_| ".".to_string())),
+            )
+        }
+        #[cfg(not(windows))]
+        {
+            PathBuf::from(env::var("HOME").unwrap_or_else(|_| ".".to_string()))
+        }
+    })
 }
 
 pub fn detect_clients() -> Vec<Box<dyn McpClient>> {
