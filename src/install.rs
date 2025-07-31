@@ -43,7 +43,7 @@ use crate::config::ConfigManager;
 use crate::deps::{Dependency, DependencyInstaller, DependencyStatus};
 use crate::error::{McpError, Result};
 use crate::logging;
-use crate::security::{SecurityValidator, SecurityValidation};
+use crate::security::{SecurityValidation, SecurityValidator};
 use crate::server::{
     detect_server_type, ConfigField, ConfigFieldType, McpServer, ServerMetadata, ServerSuggestions,
     ServerType,
@@ -408,7 +408,7 @@ impl InstallCommand {
             // NPM package
             self.security_validator.validate_npm_package(server_name)
         };
-        
+
         result.map_err(McpError::Other)
     }
 

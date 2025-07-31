@@ -1,4 +1,5 @@
 use crate::deps::{
+    base::{CommonVersionParsers, DependencyCheckerBase},
     Dependency, DependencyCheck, DependencyChecker, DependencyStatus, InstallInstructions,
     InstallMethod,
 };
@@ -32,37 +33,18 @@ impl DockerChecker {
     }
 
     fn check_docker_version(&self) -> Result<Option<String>> {
-        let output = Command::new("docker")
-            .args(["--version"])
-            .output()
-            .context("Failed to execute docker --version")?;
+        let output = DependencyCheckerBase::get_command_version("docker", &["--version"])?;
 
-        if !output.status.success() {
-            return Ok(None);
-        }
-
-        let version_output = String::from_utf8_lossy(&output.stdout);
-        let version_line = version_output.trim();
-
-        // Parse "Docker version X.Y.Z, build abcdef" format
-        if let Some(version_part) = version_line.strip_prefix("Docker version ") {
-            if let Some(comma_pos) = version_part.find(',') {
-                Ok(Some(version_part[..comma_pos].to_string()))
-            } else {
-                Ok(Some(version_part.to_string()))
-            }
-        } else {
-            Ok(None)
-        }
+        Ok(output.and_then(|version_line| {
+            CommonVersionParsers::parse_standard_format(&version_line, "Docker version ")
+        }))
     }
 
     fn check_docker_running(&self) -> Result<bool> {
-        let output = Command::new("docker")
-            .args(["info"])
-            .output()
-            .context("Failed to execute docker info")?;
-
-        Ok(output.status.success())
+        Ok(DependencyCheckerBase::is_command_available(
+            "docker",
+            &["info"],
+        ))
     }
 
     fn check_docker_compose(&self) -> Result<Option<String>> {
@@ -230,19 +212,14 @@ impl DockerChecker {
         version: &str,
         min_version: &str,
     ) -> Result<DependencyStatus> {
-        let installed_version = semver::Version::parse(version)
-            .with_context(|| format!("Invalid Docker version format: {version}"))?;
-        let required_version = semver::Version::parse(min_version)
-            .with_context(|| format!("Invalid required version format: {min_version}"))?;
+        let status = DependencyCheckerBase::check_version_requirement(version, min_version)?;
 
-        if installed_version < required_version {
-            return Ok(DependencyStatus::VersionMismatch {
-                installed: version.to_string(),
-                required: min_version.to_string(),
-            });
+        // If version is OK, still need to check compose requirement
+        if matches!(status, DependencyStatus::Installed { .. }) {
+            self.check_compose_requirement(version)
+        } else {
+            Ok(status)
         }
-
-        self.check_compose_requirement(version)
     }
 
     fn check_compose_requirement(&self, version: &str) -> Result<DependencyStatus> {
@@ -267,11 +244,10 @@ impl DockerChecker {
         &self,
         status: &DependencyStatus,
     ) -> Option<InstallInstructions> {
-        match status {
-            DependencyStatus::Missing | DependencyStatus::VersionMismatch { .. } => {
-                Some(Self::get_install_instructions())
-            }
-            _ => None,
+        if DependencyCheckerBase::should_provide_install_instructions(status) {
+            Some(Self::get_install_instructions())
+        } else {
+            None
         }
     }
 }

@@ -1,67 +1,14 @@
+mod common;
+use common::{create_isolated_config_manager, MockClient};
+
 use mcp_helper::client::{McpClient, ServerConfig};
-use mcp_helper::config::ConfigManager;
 use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
-use tempfile::TempDir;
-
-// Mock client for testing
-struct MockClient {
-    name: String,
-    servers: Arc<Mutex<HashMap<String, ServerConfig>>>,
-}
-
-impl McpClient for MockClient {
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    fn config_path(&self) -> PathBuf {
-        PathBuf::from("/mock/config.json")
-    }
-
-    fn is_installed(&self) -> bool {
-        true
-    }
-
-    fn add_server(&self, name: &str, config: ServerConfig) -> anyhow::Result<()> {
-        self.servers
-            .lock()
-            .unwrap()
-            .insert(name.to_string(), config);
-        Ok(())
-    }
-
-    fn list_servers(&self) -> anyhow::Result<HashMap<String, ServerConfig>> {
-        Ok(self.servers.lock().unwrap().clone())
-    }
-}
-
-fn create_isolated_config_manager() -> (ConfigManager, TempDir) {
-    let temp_dir = TempDir::new().unwrap();
-    let unique_id = format!(
-        "test_{}_{:?}",
-        std::process::id(),
-        std::thread::current().id()
-    );
-    let test_path = temp_dir.path().join(unique_id);
-    std::fs::create_dir_all(&test_path).unwrap();
-
-    // Set the environment variable for this test
-    std::env::set_var("XDG_DATA_HOME", &test_path);
-
-    let manager = ConfigManager::new().unwrap();
-    (manager, temp_dir)
-}
 
 #[test]
 fn test_simple_config_snapshot_creation() {
     let (manager, _temp_dir) = create_isolated_config_manager();
 
-    let client = MockClient {
-        name: "test-client".to_string(),
-        servers: Arc::new(Mutex::new(HashMap::new())),
-    };
+    let client = MockClient::new("test-client");
 
     let config = ServerConfig {
         command: "node".to_string(),
@@ -89,10 +36,7 @@ fn test_simple_config_snapshot_creation() {
 fn test_simple_config_rollback() {
     let (manager, _temp_dir) = create_isolated_config_manager();
 
-    let client = MockClient {
-        name: "rollback-client".to_string(),
-        servers: Arc::new(Mutex::new(HashMap::new())),
-    };
+    let client = MockClient::new("rollback-client");
 
     // Install initial configuration
     let initial_config = ServerConfig {
@@ -130,10 +74,7 @@ fn test_simple_config_rollback() {
 fn test_simple_config_history() {
     let (manager, _temp_dir) = create_isolated_config_manager();
 
-    let client = MockClient {
-        name: "history-client".to_string(),
-        servers: Arc::new(Mutex::new(HashMap::new())),
-    };
+    let client = MockClient::new("history-client");
 
     // Apply multiple configurations
     for i in 0..3 {
@@ -207,10 +148,7 @@ fn test_simple_config_diff() {
 fn test_simple_latest_snapshot() {
     let (manager, _temp_dir) = create_isolated_config_manager();
 
-    let client = MockClient {
-        name: "latest-client".to_string(),
-        servers: Arc::new(Mutex::new(HashMap::new())),
-    };
+    let client = MockClient::new("latest-client");
 
     // Apply a few configurations
     for i in 0..3 {

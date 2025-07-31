@@ -1,41 +1,10 @@
+mod common;
+use common::MockClient;
+
 use mcp_helper::client::{McpClient, ServerConfig};
 use mcp_helper::config::ConfigManager;
 use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
 use tempfile::TempDir;
-
-// Mock client for testing
-struct MockClient {
-    name: String,
-    servers: Arc<Mutex<HashMap<String, ServerConfig>>>,
-}
-
-impl McpClient for MockClient {
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    fn config_path(&self) -> PathBuf {
-        PathBuf::from("/mock/config.json")
-    }
-
-    fn is_installed(&self) -> bool {
-        true
-    }
-
-    fn add_server(&self, name: &str, config: ServerConfig) -> anyhow::Result<()> {
-        self.servers
-            .lock()
-            .unwrap()
-            .insert(name.to_string(), config);
-        Ok(())
-    }
-
-    fn list_servers(&self) -> anyhow::Result<HashMap<String, ServerConfig>> {
-        Ok(self.servers.lock().unwrap().clone())
-    }
-}
 
 #[test]
 fn test_config_snapshot_creation() {
@@ -48,10 +17,7 @@ fn test_config_snapshot_creation() {
 
     let manager = ConfigManager::new().unwrap();
 
-    let client = MockClient {
-        name: "test-client".to_string(),
-        servers: Arc::new(Mutex::new(HashMap::new())),
-    };
+    let client = MockClient::new("test-client");
 
     let config = ServerConfig {
         command: "node".to_string(),
@@ -86,10 +52,7 @@ fn test_config_rollback_with_previous_config() {
 
     let manager = ConfigManager::new().unwrap();
 
-    let client = MockClient {
-        name: "rollback-client".to_string(),
-        servers: Arc::new(Mutex::new(HashMap::new())),
-    };
+    let client = MockClient::new("rollback-client");
 
     // Install initial configuration
     let initial_config = ServerConfig {
@@ -134,10 +97,7 @@ fn test_config_rollback_without_previous_config() {
 
     let manager = ConfigManager::new().unwrap();
 
-    let client = MockClient {
-        name: "no-previous-client".to_string(),
-        servers: Arc::new(Mutex::new(HashMap::new())),
-    };
+    let client = MockClient::new("no-previous-client");
 
     let config = ServerConfig {
         command: "deno".to_string(),
@@ -169,10 +129,7 @@ fn test_config_history_tracking() {
 
     let manager = ConfigManager::new().unwrap();
 
-    let client = MockClient {
-        name: "history-client".to_string(),
-        servers: Arc::new(Mutex::new(HashMap::new())),
-    };
+    let client = MockClient::new("history-client");
 
     // Apply multiple configurations
     for i in 0..3 {
@@ -260,10 +217,7 @@ fn test_config_history_cleanup() {
 
     let manager = ConfigManager::new().unwrap();
 
-    let client = MockClient {
-        name: "cleanup-client".to_string(),
-        servers: Arc::new(Mutex::new(HashMap::new())),
-    };
+    let client = MockClient::new("cleanup-client");
 
     // Apply more configurations than the max history limit (default is 10)
     for i in 0..15 {
@@ -304,10 +258,7 @@ fn test_latest_snapshot_retrieval() {
 
     let manager = ConfigManager::new().unwrap();
 
-    let client = MockClient {
-        name: "latest-client".to_string(),
-        servers: Arc::new(Mutex::new(HashMap::new())),
-    };
+    let client = MockClient::new("latest-client");
 
     // Apply a few configurations
     for i in 0..3 {

@@ -1,8 +1,11 @@
 #![allow(dead_code)]
 
+use mcp_helper::client::{McpClient, ServerConfig};
 use serde_json::Value;
+use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 use tempfile::TempDir;
 
 /// Creates a temporary directory with a config file
@@ -52,4 +55,73 @@ pub fn create_config_with_servers(servers: serde_json::Map<String, Value>) -> Va
     serde_json::json!({
         "mcpServers": servers
     })
+}
+
+/// Mock client for testing
+pub struct MockClient {
+    pub name: String,
+    pub servers: Arc<Mutex<HashMap<String, ServerConfig>>>,
+}
+
+impl MockClient {
+    /// Create a new mock client with the given name
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            servers: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    /// Create a new mock client with pre-populated servers
+    pub fn with_servers(name: impl Into<String>, servers: HashMap<String, ServerConfig>) -> Self {
+        Self {
+            name: name.into(),
+            servers: Arc::new(Mutex::new(servers)),
+        }
+    }
+}
+
+impl McpClient for MockClient {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn config_path(&self) -> PathBuf {
+        PathBuf::from("/mock/config.json")
+    }
+
+    fn is_installed(&self) -> bool {
+        true
+    }
+
+    fn add_server(&self, name: &str, config: ServerConfig) -> anyhow::Result<()> {
+        self.servers
+            .lock()
+            .unwrap()
+            .insert(name.to_string(), config);
+        Ok(())
+    }
+
+    fn list_servers(&self) -> anyhow::Result<HashMap<String, ServerConfig>> {
+        Ok(self.servers.lock().unwrap().clone())
+    }
+}
+
+/// Create an isolated configuration manager for testing
+/// Returns both the ConfigManager and the TempDir (to keep it alive)
+pub fn create_isolated_config_manager() -> (mcp_helper::config::ConfigManager, TempDir) {
+    let temp_dir = TempDir::new().unwrap();
+    let unique_id = format!(
+        "test_{}_{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    );
+    let test_path = temp_dir.path().join(unique_id);
+    std::fs::create_dir_all(&test_path).unwrap();
+
+    // Set the environment variable for this test
+    std::env::set_var("XDG_DATA_HOME", &test_path);
+
+    let manager = mcp_helper::config::ConfigManager::new().unwrap();
+    (manager, temp_dir)
 }

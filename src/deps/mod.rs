@@ -1,3 +1,4 @@
+pub mod base;
 pub mod docker;
 pub mod installer;
 pub mod node;

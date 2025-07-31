@@ -1,8 +1,9 @@
 use crate::deps::{
+    base::{CommonVersionParsers, DependencyCheckerBase},
     Dependency, DependencyCheck, DependencyChecker, DependencyStatus, InstallInstructions,
     InstallMethod,
 };
-use anyhow::{Context, Result};
+use anyhow::Result;
 use std::process::Command;
 
 #[derive(Debug)]
@@ -27,29 +28,11 @@ impl PythonChecker {
     }
 
     fn check_python_version(&self, python_cmd: &str) -> Result<Option<String>> {
-        let output = Command::new(python_cmd)
-            .arg("--version")
-            .output()
-            .context(format!("Failed to execute {python_cmd}"))?;
+        let output = DependencyCheckerBase::get_command_version(python_cmd, &["--version"])?;
 
-        if !output.status.success() {
-            return Ok(None);
-        }
-
-        let version_output = String::from_utf8_lossy(&output.stdout);
-        let version_line = version_output.trim();
-
-        // Parse "Python X.Y.Z" format
-        if let Some(version_part) = version_line.strip_prefix("Python ") {
-            if let Some(space_pos) = version_part.find(' ') {
-                // Handle cases like "Python 3.9.0 (default, ...)"
-                Ok(Some(version_part[..space_pos].to_string()))
-            } else {
-                Ok(Some(version_part.to_string()))
-            }
-        } else {
-            Ok(None)
-        }
+        Ok(output.and_then(|version_line| {
+            CommonVersionParsers::parse_standard_format(&version_line, "Python ")
+        }))
     }
 
     fn get_install_instructions() -> InstallInstructions {
@@ -152,23 +135,7 @@ impl DependencyChecker for PythonChecker {
         let status = match found_version {
             Some(version) => {
                 if let Some(ref min_version) = self.min_version {
-                    let installed_version = semver::Version::parse(&version)
-                        .with_context(|| format!("Invalid version format: {version}"))?;
-                    let required_version =
-                        semver::Version::parse(min_version).with_context(|| {
-                            format!("Invalid required version format: {min_version}")
-                        })?;
-
-                    if installed_version >= required_version {
-                        DependencyStatus::Installed {
-                            version: Some(version),
-                        }
-                    } else {
-                        DependencyStatus::VersionMismatch {
-                            installed: version,
-                            required: min_version.clone(),
-                        }
-                    }
+                    DependencyCheckerBase::check_version_requirement(&version, min_version)?
                 } else {
                     DependencyStatus::Installed {
                         version: Some(version),
@@ -178,12 +145,12 @@ impl DependencyChecker for PythonChecker {
             None => DependencyStatus::Missing,
         };
 
-        let install_instructions = match status {
-            DependencyStatus::Missing | DependencyStatus::VersionMismatch { .. } => {
+        let install_instructions =
+            if DependencyCheckerBase::should_provide_install_instructions(&status) {
                 Some(Self::get_install_instructions())
-            }
-            _ => None,
-        };
+            } else {
+                None
+            };
 
         Ok(DependencyCheck {
             dependency,
@@ -199,16 +166,18 @@ pub fn check_pip_available() -> Result<bool> {
 
     for cmd_str in pip_commands {
         let cmd_parts: Vec<&str> = cmd_str.split_whitespace().collect();
-        let mut command = Command::new(cmd_parts[0]);
-        for part in &cmd_parts[1..] {
-            command.arg(part);
+        if cmd_parts.is_empty() {
+            continue;
         }
-        command.arg("--version");
 
-        if let Ok(output) = command.output() {
-            if output.status.success() {
-                return Ok(true);
-            }
+        let test_args: Vec<&str> = cmd_parts[1..]
+            .iter()
+            .cloned()
+            .chain(std::iter::once("--version"))
+            .collect();
+
+        if DependencyCheckerBase::is_command_available(cmd_parts[0], &test_args) {
+            return Ok(true);
         }
     }
 
