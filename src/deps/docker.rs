@@ -49,6 +49,15 @@ impl DockerChecker {
 
     fn check_docker_compose(&self) -> Result<Option<String>> {
         // Try docker compose (new syntax) first
+        if let Some(version) = self.try_docker_compose_new_syntax()? {
+            return Ok(Some(version));
+        }
+
+        // Try docker-compose (legacy syntax)
+        self.try_docker_compose_legacy_syntax()
+    }
+
+    fn try_docker_compose_new_syntax(&self) -> Result<Option<String>> {
         let output = Command::new("docker")
             .args(["compose", "version"])
             .output()
@@ -57,14 +66,14 @@ impl DockerChecker {
         if output.status.success() {
             let version_output = String::from_utf8_lossy(&output.stdout);
             if let Some(version_line) = version_output.lines().next() {
-                // Parse "Docker Compose version vX.Y.Z" format
-                if let Some(version_part) = version_line.strip_prefix("Docker Compose version v") {
-                    return Ok(Some(version_part.trim().to_string()));
-                }
+                return Ok(self.parse_docker_compose_new_format(version_line));
             }
         }
 
-        // Try docker-compose (legacy syntax)
+        Ok(None)
+    }
+
+    fn try_docker_compose_legacy_syntax(&self) -> Result<Option<String>> {
         let output = Command::new("docker-compose")
             .args(["--version"])
             .output()
@@ -73,18 +82,31 @@ impl DockerChecker {
         if output.status.success() {
             let version_output = String::from_utf8_lossy(&output.stdout);
             if let Some(version_line) = version_output.lines().next() {
-                // Parse "docker-compose version X.Y.Z, build abcdef" format
-                if let Some(version_part) = version_line.strip_prefix("docker-compose version ") {
-                    if let Some(comma_pos) = version_part.find(',') {
-                        return Ok(Some(version_part[..comma_pos].to_string()));
-                    } else {
-                        return Ok(Some(version_part.trim().to_string()));
-                    }
-                }
+                return Ok(self.parse_docker_compose_legacy_format(version_line));
             }
         }
 
         Ok(None)
+    }
+
+    fn parse_docker_compose_new_format(&self, version_line: &str) -> Option<String> {
+        // Parse "Docker Compose version vX.Y.Z" format
+        version_line
+            .strip_prefix("Docker Compose version v")
+            .map(|version_part| version_part.trim().to_string())
+    }
+
+    fn parse_docker_compose_legacy_format(&self, version_line: &str) -> Option<String> {
+        // Parse "docker-compose version X.Y.Z, build abcdef" format
+        version_line
+            .strip_prefix("docker-compose version ")
+            .map(|version_part| {
+                if let Some(comma_pos) = version_part.find(',') {
+                    version_part[..comma_pos].to_string()
+                } else {
+                    version_part.trim().to_string()
+                }
+            })
     }
 
     fn get_install_instructions() -> InstallInstructions {
