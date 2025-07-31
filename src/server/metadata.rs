@@ -82,6 +82,18 @@ pub struct RegistryEntry {
     pub verified: bool,
 }
 
+/// Parameters for creating a registry entry
+struct RegistryEntryParams<'a> {
+    package_name: &'a str,
+    name: &'a str,
+    description: &'a str,
+    category: &'a str,
+    tags: Vec<&'a str>,
+    popularity_score: f64,
+    last_updated: &'a str,
+    verified: bool,
+}
+
 /// Server metadata loader and manager
 pub struct MetadataLoader {
     cache: HashMap<String, ExtendedServerMetadata>,
@@ -173,57 +185,15 @@ impl MetadataLoader {
         &self,
         package: PackageJson,
     ) -> Result<ExtendedServerMetadata> {
-        let author = match package.author {
-            Some(serde_json::Value::String(s)) => Some(s),
-            Some(serde_json::Value::Object(obj)) => obj
-                .get("name")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
-            _ => None,
-        };
-
-        let repository = match package.repository {
-            Some(serde_json::Value::String(s)) => Some(s),
-            Some(serde_json::Value::Object(obj)) => obj
-                .get("url")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
-            _ => None,
-        };
-
-        let platform_support = PlatformSupport {
-            windows: true, // Assume all platforms unless specified otherwise
-            macos: true,
-            linux: true,
-            min_node_version: package.engines.as_ref().and_then(|e| e.node.clone()),
-            min_python_version: package.engines.as_ref().and_then(|e| e.python.clone()),
-        };
-
+        let author = Self::extract_json_field_as_string(&package.author, "name");
+        let repository = Self::extract_json_field_as_string(&package.repository, "url");
+        let platform_support = Self::create_platform_support(&package.engines);
         let server_type = ServerType::Npm {
             package: package.name.clone(),
             version: Some(package.version.clone()),
         };
 
-        let required_config = package
-            .mcp
-            .as_ref()
-            .and_then(|mcp| mcp.required_config.as_ref())
-            .cloned()
-            .unwrap_or_default();
-
-        let optional_config = package
-            .mcp
-            .as_ref()
-            .and_then(|mcp| mcp.optional_config.as_ref())
-            .cloned()
-            .unwrap_or_default();
-
-        let examples = package
-            .mcp
-            .as_ref()
-            .and_then(|mcp| mcp.examples.as_ref())
-            .cloned()
-            .unwrap_or_default();
+        let (required_config, optional_config, examples) = Self::extract_mcp_config(&package.mcp);
 
         Ok(ExtendedServerMetadata {
             name: package.name,
@@ -243,76 +213,132 @@ impl MetadataLoader {
         })
     }
 
+    fn extract_json_field_as_string(
+        value: &Option<serde_json::Value>,
+        field_name: &str,
+    ) -> Option<String> {
+        match value {
+            Some(serde_json::Value::String(s)) => Some(s.clone()),
+            Some(serde_json::Value::Object(obj)) => obj
+                .get(field_name)
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            _ => None,
+        }
+    }
+
+    fn create_platform_support(engines: &Option<PackageEngines>) -> PlatformSupport {
+        PlatformSupport {
+            windows: true, // Assume all platforms unless specified otherwise
+            macos: true,
+            linux: true,
+            min_node_version: engines.as_ref().and_then(|e| e.node.clone()),
+            min_python_version: engines.as_ref().and_then(|e| e.python.clone()),
+        }
+    }
+
+    fn extract_mcp_config(
+        mcp: &Option<McpConfig>,
+    ) -> (Vec<ConfigField>, Vec<ConfigField>, Vec<UsageExample>) {
+        let required_config = mcp
+            .as_ref()
+            .and_then(|mcp| mcp.required_config.as_ref())
+            .cloned()
+            .unwrap_or_default();
+
+        let optional_config = mcp
+            .as_ref()
+            .and_then(|mcp| mcp.optional_config.as_ref())
+            .cloned()
+            .unwrap_or_default();
+
+        let examples = mcp
+            .as_ref()
+            .and_then(|mcp| mcp.examples.as_ref())
+            .cloned()
+            .unwrap_or_default();
+
+        (required_config, optional_config, examples)
+    }
+
     fn get_mock_registry(&self) -> HashMap<String, RegistryEntry> {
         let mut registry = HashMap::new();
 
-        registry.insert(
-            "@modelcontextprotocol/server-filesystem".to_string(),
-            RegistryEntry {
-                name: "Filesystem Server".to_string(),
-                description: "MCP server for filesystem operations".to_string(),
-                package_name: "@modelcontextprotocol/server-filesystem".to_string(),
-                server_type: ServerType::Npm {
-                    package: "@modelcontextprotocol/server-filesystem".to_string(),
-                    version: None,
-                },
-                category: "File Management".to_string(),
-                tags: vec![
-                    "filesystem".to_string(),
-                    "files".to_string(),
-                    "directory".to_string(),
-                ],
-                popularity_score: 9.5,
-                last_updated: "2024-01-15".to_string(),
-                verified: true,
-            },
-        );
+        let entries = [
+            (
+                "@modelcontextprotocol/server-filesystem",
+                "Filesystem Server",
+                "MCP server for filesystem operations",
+                "File Management",
+                vec!["filesystem", "files", "directory"],
+                9.5,
+                "2024-01-15",
+                true,
+            ),
+            (
+                "@anthropic/mcp-server-slack",
+                "Slack Server",
+                "MCP server for Slack integration",
+                "Communication",
+                vec!["slack", "messaging", "api"],
+                8.7,
+                "2024-01-10",
+                true,
+            ),
+            (
+                "mcp-server-git",
+                "Git Server",
+                "MCP server for Git operations",
+                "Version Control",
+                vec!["git", "version-control", "repository"],
+                8.2,
+                "2024-01-08",
+                false,
+            ),
+        ];
 
-        registry.insert(
-            "@anthropic/mcp-server-slack".to_string(),
-            RegistryEntry {
-                name: "Slack Server".to_string(),
-                description: "MCP server for Slack integration".to_string(),
-                package_name: "@anthropic/mcp-server-slack".to_string(),
-                server_type: ServerType::Npm {
-                    package: "@anthropic/mcp-server-slack".to_string(),
-                    version: None,
-                },
-                category: "Communication".to_string(),
-                tags: vec![
-                    "slack".to_string(),
-                    "messaging".to_string(),
-                    "api".to_string(),
-                ],
-                popularity_score: 8.7,
-                last_updated: "2024-01-10".to_string(),
-                verified: true,
-            },
-        );
-
-        registry.insert(
-            "mcp-server-git".to_string(),
-            RegistryEntry {
-                name: "Git Server".to_string(),
-                description: "MCP server for Git operations".to_string(),
-                package_name: "mcp-server-git".to_string(),
-                server_type: ServerType::Npm {
-                    package: "mcp-server-git".to_string(),
-                    version: None,
-                },
-                category: "Version Control".to_string(),
-                tags: vec![
-                    "git".to_string(),
-                    "version-control".to_string(),
-                    "repository".to_string(),
-                ],
-                popularity_score: 8.2,
-                last_updated: "2024-01-08".to_string(),
-                verified: false,
-            },
-        );
+        for (
+            package_name,
+            name,
+            description,
+            category,
+            tags,
+            popularity_score,
+            last_updated,
+            verified,
+        ) in entries
+        {
+            let entry = self.create_registry_entry(&RegistryEntryParams {
+                package_name,
+                name,
+                description,
+                category,
+                tags,
+                popularity_score,
+                last_updated,
+                verified,
+            });
+            registry.insert(package_name.to_string(), entry);
+        }
 
         registry
+    }
+
+    fn create_registry_entry(&self, params: &RegistryEntryParams) -> RegistryEntry {
+        RegistryEntry {
+            name: params.name.to_string(),
+            description: params.description.to_string(),
+            package_name: params.package_name.to_string(),
+            server_type: ServerType::Npm {
+                package: params.package_name.to_string(),
+                version: None,
+            },
+            category: params.category.to_string(),
+            tags: params.tags.iter().map(|s| s.to_string()).collect(),
+            popularity_score: params.popularity_score,
+            last_updated: params.last_updated.to_string(),
+            verified: params.verified,
+        }
     }
 }
 

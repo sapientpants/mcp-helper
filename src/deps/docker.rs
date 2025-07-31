@@ -1,7 +1,6 @@
 use crate::deps::{
     base::{CommonVersionParsers, DependencyCheckerBase},
     Dependency, DependencyCheck, DependencyChecker, DependencyStatus, InstallInstructions,
-    InstallMethod,
 };
 use anyhow::{Context, Result};
 use std::process::Command;
@@ -108,77 +107,6 @@ impl DockerChecker {
                 }
             })
     }
-
-    fn get_install_instructions() -> InstallInstructions {
-        InstallInstructions {
-            windows: vec![
-                InstallMethod {
-                    name: "Docker Desktop".to_string(),
-                    command: "Download and install from https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe".to_string(),
-                    description: Some("Official Docker Desktop for Windows with GUI".to_string()),
-                },
-                InstallMethod {
-                    name: "Chocolatey".to_string(),
-                    command: "choco install docker-desktop".to_string(),
-                    description: Some("Package manager installation".to_string()),
-                },
-                InstallMethod {
-                    name: "winget".to_string(),
-                    command: "winget install Docker.DockerDesktop".to_string(),
-                    description: Some("Windows Package Manager".to_string()),
-                },
-            ],
-            macos: vec![
-                InstallMethod {
-                    name: "Docker Desktop".to_string(),
-                    command: "Download and install from https://desktop.docker.com/mac/main/amd64/Docker.dmg".to_string(),
-                    description: Some("Official Docker Desktop for macOS with GUI".to_string()),
-                },
-                InstallMethod {
-                    name: "Homebrew".to_string(),
-                    command: "brew install --cask docker".to_string(),
-                    description: Some("Package manager installation".to_string()),
-                },
-                InstallMethod {
-                    name: "Homebrew (CLI only)".to_string(),
-                    command: "brew install docker docker-compose".to_string(),
-                    description: Some("Command-line only (requires separate Docker daemon)".to_string()),
-                },
-            ],
-            linux: vec![
-                InstallMethod {
-                    name: "Docker Engine (Ubuntu/Debian)".to_string(),
-                    command: "curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh".to_string(),
-                    description: Some("Official Docker installation script".to_string()),
-                },
-                InstallMethod {
-                    name: "apt (Ubuntu/Debian)".to_string(),
-                    command: "sudo apt update && sudo apt install docker.io docker-compose".to_string(),
-                    description: Some("System package manager".to_string()),
-                },
-                InstallMethod {
-                    name: "dnf (Fedora)".to_string(),
-                    command: "sudo dnf install docker docker-compose".to_string(),
-                    description: Some("System package manager".to_string()),
-                },
-                InstallMethod {
-                    name: "yum (RHEL/CentOS)".to_string(),
-                    command: "sudo yum install docker docker-compose".to_string(),
-                    description: Some("System package manager".to_string()),
-                },
-                InstallMethod {
-                    name: "pacman (Arch)".to_string(),
-                    command: "sudo pacman -S docker docker-compose".to_string(),
-                    description: Some("System package manager".to_string()),
-                },
-                InstallMethod {
-                    name: "snap".to_string(),
-                    command: "sudo snap install docker".to_string(),
-                    description: Some("Universal Linux packages".to_string()),
-                },
-            ],
-        }
-    }
 }
 
 impl Default for DockerChecker {
@@ -267,7 +195,11 @@ impl DockerChecker {
         status: &DependencyStatus,
     ) -> Option<InstallInstructions> {
         if DependencyCheckerBase::should_provide_install_instructions(status) {
-            Some(Self::get_install_instructions())
+            let dependency = Dependency::Docker {
+                min_version: self.min_version.clone(),
+                requires_compose: self.check_compose,
+            };
+            Some(crate::deps::get_install_instructions(&dependency))
         } else {
             None
         }
@@ -370,7 +302,11 @@ mod tests {
 
     #[test]
     fn test_install_instructions() {
-        let instructions = DockerChecker::get_install_instructions();
+        let dependency = Dependency::Docker {
+            min_version: None,
+            requires_compose: false,
+        };
+        let instructions = crate::deps::get_install_instructions(&dependency);
 
         assert!(!instructions.windows.is_empty());
         assert!(!instructions.macos.is_empty());
@@ -380,15 +316,15 @@ mod tests {
         assert!(instructions
             .windows
             .iter()
-            .any(|m| m.name.contains("Docker Desktop")));
+            .any(|m| m.name.contains("docker-desktop")));
         assert!(instructions
             .macos
             .iter()
-            .any(|m| m.name.contains("Docker Desktop")));
+            .any(|m| m.name.contains("docker-desktop")));
         assert!(instructions
             .linux
             .iter()
-            .any(|m| m.name.contains("Docker Engine")));
+            .any(|m| m.name.contains("docker-ce")));
     }
 
     #[test]

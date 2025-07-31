@@ -1,7 +1,6 @@
 use crate::deps::{
     base::{CommonVersionParsers, DependencyCheckerBase},
-    Dependency, DependencyCheck, DependencyChecker, DependencyStatus, InstallInstructions,
-    InstallMethod,
+    Dependency, DependencyCheck, DependencyChecker, DependencyStatus,
 };
 use anyhow::Result;
 use std::process::Command;
@@ -33,77 +32,6 @@ impl PythonChecker {
         Ok(output.and_then(|version_line| {
             CommonVersionParsers::parse_standard_format(&version_line, "Python ")
         }))
-    }
-
-    fn get_install_instructions() -> InstallInstructions {
-        InstallInstructions {
-            windows: vec![
-                InstallMethod {
-                    name: "Python.org".to_string(),
-                    command: "Download and install from https://python.org/downloads/".to_string(),
-                    description: Some("Official Python installer with pip included".to_string()),
-                },
-                InstallMethod {
-                    name: "Microsoft Store".to_string(),
-                    command: "Install Python from Microsoft Store".to_string(),
-                    description: Some("Easy installation through Windows Store".to_string()),
-                },
-                InstallMethod {
-                    name: "Chocolatey".to_string(),
-                    command: "choco install python".to_string(),
-                    description: Some("Package manager installation".to_string()),
-                },
-                InstallMethod {
-                    name: "winget".to_string(),
-                    command: "winget install Python.Python.3".to_string(),
-                    description: Some("Windows Package Manager".to_string()),
-                },
-            ],
-            macos: vec![
-                InstallMethod {
-                    name: "Homebrew".to_string(),
-                    command: "brew install python3".to_string(),
-                    description: Some("Most popular macOS package manager".to_string()),
-                },
-                InstallMethod {
-                    name: "Python.org".to_string(),
-                    command: "Download and install from https://python.org/downloads/".to_string(),
-                    description: Some("Official Python installer".to_string()),
-                },
-                InstallMethod {
-                    name: "pyenv".to_string(),
-                    command: "pyenv install 3.11.0 && pyenv global 3.11.0".to_string(),
-                    description: Some("Python version manager (install pyenv first)".to_string()),
-                },
-            ],
-            linux: vec![
-                InstallMethod {
-                    name: "apt (Ubuntu/Debian)".to_string(),
-                    command: "sudo apt update && sudo apt install python3 python3-pip".to_string(),
-                    description: Some("System package manager".to_string()),
-                },
-                InstallMethod {
-                    name: "dnf (Fedora)".to_string(),
-                    command: "sudo dnf install python3 python3-pip".to_string(),
-                    description: Some("System package manager".to_string()),
-                },
-                InstallMethod {
-                    name: "yum (RHEL/CentOS)".to_string(),
-                    command: "sudo yum install python3 python3-pip".to_string(),
-                    description: Some("System package manager".to_string()),
-                },
-                InstallMethod {
-                    name: "pacman (Arch)".to_string(),
-                    command: "sudo pacman -S python python-pip".to_string(),
-                    description: Some("System package manager".to_string()),
-                },
-                InstallMethod {
-                    name: "snap".to_string(),
-                    command: "sudo snap install python3 --classic".to_string(),
-                    description: Some("Universal Linux packages".to_string()),
-                },
-            ],
-        }
     }
 }
 
@@ -147,7 +75,7 @@ impl DependencyChecker for PythonChecker {
 
         let install_instructions =
             if DependencyCheckerBase::should_provide_install_instructions(&status) {
-                Some(Self::get_install_instructions())
+                Some(crate::deps::get_install_instructions(&dependency))
             } else {
                 None
             };
@@ -252,7 +180,8 @@ mod tests {
 
     #[test]
     fn test_install_instructions() {
-        let instructions = PythonChecker::get_install_instructions();
+        let dependency = Dependency::Python { min_version: None };
+        let instructions = crate::deps::get_install_instructions(&dependency);
 
         assert!(!instructions.windows.is_empty());
         assert!(!instructions.macos.is_empty());
@@ -262,11 +191,11 @@ mod tests {
         assert!(instructions
             .windows
             .iter()
-            .any(|m| m.name.contains("Python.org")));
+            .any(|m| m.name.contains("winget")));
         assert!(instructions
             .macos
             .iter()
-            .any(|m| m.name.contains("Homebrew")));
+            .any(|m| m.name.contains("homebrew")));
         assert!(instructions.linux.iter().any(|m| m.name.contains("apt")));
     }
 
