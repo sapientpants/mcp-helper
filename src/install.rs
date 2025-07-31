@@ -43,9 +43,10 @@ use crate::config::ConfigManager;
 use crate::deps::{Dependency, DependencyInstaller, DependencyStatus};
 use crate::error::{McpError, Result};
 use crate::logging;
-use crate::security::SecurityValidator;
+use crate::security::{SecurityValidator, SecurityValidation};
 use crate::server::{
-    detect_server_type, ConfigField, ConfigFieldType, McpServer, ServerSuggestions, ServerType,
+    detect_server_type, ConfigField, ConfigFieldType, McpServer, ServerMetadata, ServerSuggestions,
+    ServerType,
 };
 
 /// Main installation command for MCP servers.
@@ -385,28 +386,41 @@ impl InstallCommand {
     }
 
     fn validate_server_security(&self, server_name: &str) -> Result<()> {
-        let validation =
-            if server_name.starts_with("http://") || server_name.starts_with("https://") {
-                // Direct URL
-                self.security_validator.validate_url(server_name)?
-            } else if server_name.starts_with("docker:") {
-                // Docker image
-                let image_name = server_name.strip_prefix("docker:").unwrap_or(server_name);
-                self.security_validator.validate_docker_image(image_name)?
-            } else if server_name.contains('/') && !server_name.starts_with('@') {
-                // Likely a GitHub repo or similar
-                let url = if server_name.starts_with("github.com/") {
-                    format!("https://{server_name}")
-                } else {
-                    format!("https://github.com/{server_name}")
-                };
-                self.security_validator.validate_url(&url)?
-            } else {
-                // NPM package
-                self.security_validator.validate_npm_package(server_name)?
-            };
+        let validation = self.perform_security_validation(server_name)?;
+        self.log_security_validation(server_name, &validation);
+        self.handle_security_warnings(&validation)?;
+        Ok(())
+    }
 
-        // Log security check
+    fn perform_security_validation(&self, server_name: &str) -> Result<SecurityValidation> {
+        let result = if server_name.starts_with("http://") || server_name.starts_with("https://") {
+            // Direct URL
+            self.security_validator.validate_url(server_name)
+        } else if server_name.starts_with("docker:") {
+            // Docker image
+            let image_name = server_name.strip_prefix("docker:").unwrap_or(server_name);
+            self.security_validator.validate_docker_image(image_name)
+        } else if server_name.contains('/') && !server_name.starts_with('@') {
+            // Likely a GitHub repo or similar
+            let url = self.build_github_url(server_name);
+            self.security_validator.validate_url(&url)
+        } else {
+            // NPM package
+            self.security_validator.validate_npm_package(server_name)
+        };
+        
+        result.map_err(McpError::Other)
+    }
+
+    fn build_github_url(&self, server_name: &str) -> String {
+        if server_name.starts_with("github.com/") {
+            format!("https://{server_name}")
+        } else {
+            format!("https://github.com/{server_name}")
+        }
+    }
+
+    fn log_security_validation(&self, server_name: &str, validation: &SecurityValidation) {
         tracing::info!(
             server = server_name,
             is_trusted = validation.is_trusted,
@@ -414,46 +428,55 @@ impl InstallCommand {
             domain = validation.domain.as_deref().unwrap_or("unknown"),
             "Security validation completed"
         );
+    }
 
-        // Handle warnings
-        if !validation.warnings.is_empty() {
-            println!(
-                "{} {}",
-                "⚠".yellow(),
-                "Security warnings detected:".yellow()
-            );
-            for warning in &validation.warnings {
-                println!("  {} {}", "•".yellow(), warning);
+    fn handle_security_warnings(&self, validation: &SecurityValidation) -> Result<()> {
+        if validation.warnings.is_empty() {
+            if self.verbose {
+                println!("{} Security validation passed", "✓".green());
             }
-
-            // Block if validation says we should
-            if validation.should_block() {
-                return Err(McpError::Other(anyhow::anyhow!(
-                    "Installation blocked due to security concerns. Use --force to override (if available)."
-                )));
-            }
-
-            // Prompt user for non-blocking warnings
-            if !validation.is_safe() && !self.dry_run {
-                println!();
-                let proceed = Confirm::new()
-                    .with_prompt("Do you want to proceed despite these warnings?")
-                    .default(false)
-                    .interact()
-                    .map_err(|e| {
-                        McpError::Other(anyhow::anyhow!("Failed to read user input: {}", e))
-                    })?;
-
-                if !proceed {
-                    return Err(McpError::Other(anyhow::anyhow!(
-                        "Installation cancelled by user due to security warnings."
-                    )));
-                }
-            }
-        } else if self.verbose {
-            println!("{} Security validation passed", "✓".green());
+            return Ok(());
         }
 
+        self.display_security_warnings(&validation.warnings);
+
+        if validation.should_block() {
+            return Err(McpError::Other(anyhow::anyhow!(
+                "Installation blocked due to security concerns. Use --force to override (if available)."
+            )));
+        }
+
+        if !validation.is_safe() && !self.dry_run {
+            self.prompt_security_confirmation()?
+        }
+
+        Ok(())
+    }
+
+    fn display_security_warnings(&self, warnings: &[String]) {
+        println!(
+            "{} {}",
+            "⚠".yellow(),
+            "Security warnings detected:".yellow()
+        );
+        for warning in warnings {
+            println!("  {} {}", "•".yellow(), warning);
+        }
+    }
+
+    fn prompt_security_confirmation(&self) -> Result<()> {
+        println!();
+        let proceed = Confirm::new()
+            .with_prompt("Do you want to proceed despite these warnings?")
+            .default(false)
+            .interact()
+            .map_err(|e| McpError::Other(anyhow::anyhow!("Failed to read user input: {}", e)))?;
+
+        if !proceed {
+            return Err(McpError::Other(anyhow::anyhow!(
+                "Installation cancelled by user due to security warnings."
+            )));
+        }
         Ok(())
     }
 
@@ -839,27 +862,46 @@ impl InstallCommand {
 
     fn prompt_configuration(&self, server: &dyn McpServer) -> Result<HashMap<String, String>> {
         let metadata = server.metadata();
+        let mut config = self.initialize_config();
+        let all_fields = self.collect_all_fields(metadata);
+
+        if all_fields.is_empty() {
+            return self.handle_no_config_required();
+        }
+
+        let is_non_interactive = !self.config_overrides.is_empty();
+        self.display_config_mode(is_non_interactive);
+
+        for field in all_fields {
+            self.process_config_field(&mut config, field, metadata, is_non_interactive)?;
+        }
+
+        self.validate_final_config(server, &config)?;
+        Ok(config)
+    }
+
+    fn initialize_config(&self) -> HashMap<String, String> {
         let mut config = HashMap::new();
-
-        // Start with config overrides from command line
         config.extend(self.config_overrides.clone());
+        config
+    }
 
-        let all_fields: Vec<_> = metadata
+    fn collect_all_fields<'a>(&self, metadata: &'a ServerMetadata) -> Vec<&'a ConfigField> {
+        metadata
             .required_config
             .iter()
             .chain(metadata.optional_config.iter())
-            .collect();
+            .collect()
+    }
 
-        if all_fields.is_empty() {
-            if self.verbose {
-                eprintln!("{} No configuration required for this server", "ℹ".blue());
-            }
-            return Ok(config);
+    fn handle_no_config_required(&self) -> Result<HashMap<String, String>> {
+        if self.verbose {
+            eprintln!("{} No configuration required for this server", "ℹ".blue());
         }
+        Ok(self.initialize_config())
+    }
 
-        // Check if we're in non-interactive mode (have config overrides)
-        let is_non_interactive = !self.config_overrides.is_empty();
-
+    fn display_config_mode(&self, is_non_interactive: bool) {
         if is_non_interactive {
             if self.verbose {
                 eprintln!(
@@ -870,60 +912,93 @@ impl InstallCommand {
         } else {
             println!("\n{}", "Configuration:".blue().bold());
         }
+    }
 
-        for field in all_fields {
-            // Skip prompting if we already have this field from overrides
-            if config.contains_key(&field.name) {
-                if self.verbose {
-                    eprintln!(
-                        "  {} Using override for {}: {}",
-                        "→".green(),
-                        field.name,
-                        config[&field.name]
-                    );
-                }
-                continue;
-            }
-
-            let is_required = metadata
-                .required_config
-                .iter()
-                .any(|f| f.name == field.name);
-
-            // In non-interactive mode, skip optional fields but fail on required ones
-            if is_non_interactive {
-                if is_required {
-                    return Err(McpError::Other(anyhow::anyhow!(
-                        "Required configuration field '{}' not provided via --config",
-                        field.name
-                    )));
-                }
-                continue;
-            }
-
-            let prompt = Self::build_field_prompt(field, is_required);
-
-            let value = match field.field_type {
-                ConfigFieldType::String | ConfigFieldType::Path | ConfigFieldType::Url => {
-                    match self.prompt_string_field(field, &prompt, is_required)? {
-                        Some(v) => v,
-                        None => continue,
-                    }
-                }
-                ConfigFieldType::Number => {
-                    match self.prompt_number_field(field, &prompt, is_required, &metadata.name)? {
-                        Some(v) => v,
-                        None => continue,
-                    }
-                }
-                ConfigFieldType::Boolean => self.prompt_boolean_field(field, &prompt)?,
-            };
-
-            config.insert(field.name.clone(), value);
+    fn process_config_field(
+        &self,
+        config: &mut HashMap<String, String>,
+        field: &ConfigField,
+        metadata: &ServerMetadata,
+        is_non_interactive: bool,
+    ) -> Result<()> {
+        if self.should_skip_field(config, field)? {
+            return Ok(());
         }
 
-        // Validate the configuration using ConfigManager
-        if let Err(validation_errors) = self.config_manager.validate_config(server, &config) {
+        let is_required = self.is_required_field(field, metadata);
+
+        if is_non_interactive {
+            return self.handle_non_interactive_field(field, is_required);
+        }
+
+        let value = self.prompt_for_field_value(field, is_required, &metadata.name)?;
+        if let Some(v) = value {
+            config.insert(field.name.clone(), v);
+        }
+        Ok(())
+    }
+
+    fn should_skip_field(
+        &self,
+        config: &HashMap<String, String>,
+        field: &ConfigField,
+    ) -> Result<bool> {
+        if config.contains_key(&field.name) {
+            if self.verbose {
+                eprintln!(
+                    "  {} Using override for {}: {}",
+                    "→".green(),
+                    field.name,
+                    config[&field.name]
+                );
+            }
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
+    fn is_required_field(&self, field: &ConfigField, metadata: &ServerMetadata) -> bool {
+        metadata
+            .required_config
+            .iter()
+            .any(|f| f.name == field.name)
+    }
+
+    fn handle_non_interactive_field(&self, field: &ConfigField, is_required: bool) -> Result<()> {
+        if is_required {
+            return Err(McpError::Other(anyhow::anyhow!(
+                "Required configuration field '{}' not provided via --config",
+                field.name
+            )));
+        }
+        Ok(())
+    }
+
+    fn prompt_for_field_value(
+        &self,
+        field: &ConfigField,
+        is_required: bool,
+        server_name: &str,
+    ) -> Result<Option<String>> {
+        let prompt = Self::build_field_prompt(field, is_required);
+
+        match field.field_type {
+            ConfigFieldType::String | ConfigFieldType::Path | ConfigFieldType::Url => {
+                self.prompt_string_field(field, &prompt, is_required)
+            }
+            ConfigFieldType::Number => {
+                self.prompt_number_field(field, &prompt, is_required, server_name)
+            }
+            ConfigFieldType::Boolean => Ok(Some(self.prompt_boolean_field(field, &prompt)?)),
+        }
+    }
+
+    fn validate_final_config(
+        &self,
+        server: &dyn McpServer,
+        config: &HashMap<String, String>,
+    ) -> Result<()> {
+        if let Err(validation_errors) = self.config_manager.validate_config(server, config) {
             for error in &validation_errors {
                 eprintln!("  {} {}", "✗".red(), error);
             }
@@ -932,8 +1007,7 @@ impl InstallCommand {
                 validation_errors.len()
             )));
         }
-
-        Ok(config)
+        Ok(())
     }
 
     fn install_to_client(

@@ -233,64 +233,11 @@ impl McpServer for DockerServer {
     }
 
     fn validate_config(&self, config: &HashMap<String, String>) -> Result<()> {
-        // Validate volumes format
-        if let Some(volumes) = config.get("volumes") {
-            for volume in volumes.split(',') {
-                let volume = volume.trim();
-                if !volume.is_empty() && !volume.contains(':') {
-                    anyhow::bail!(
-                        "Invalid volume format '{}'. Expected 'host:container' format",
-                        volume
-                    );
-                }
-            }
-        }
-
-        // Validate environment variables format
-        if let Some(env_vars) = config.get("environment") {
-            for env_var in env_vars.split(',') {
-                let env_var = env_var.trim();
-                if !env_var.is_empty() && !env_var.contains('=') {
-                    anyhow::bail!(
-                        "Invalid environment variable format '{}'. Expected 'KEY=value' format",
-                        env_var
-                    );
-                }
-            }
-        }
-
-        // Validate ports format
-        if let Some(ports) = config.get("ports") {
-            for port in ports.split(',') {
-                let port = port.trim();
-                if !port.is_empty() && !port.contains(':') {
-                    anyhow::bail!(
-                        "Invalid port format '{}'. Expected 'host:container' format",
-                        port
-                    );
-                }
-            }
-        }
-
-        // Validate restart policy
-        if let Some(restart_policy) = config.get("restart_policy") {
-            let valid_policies = ["no", "always", "unless-stopped", "on-failure"];
-            if !valid_policies.contains(&restart_policy.as_str()) {
-                anyhow::bail!(
-                    "Invalid restart policy '{}'. Valid options: {}",
-                    restart_policy,
-                    valid_policies.join(", ")
-                );
-            }
-        }
-
-        // Validate numeric values
-        if let Some(cpu_limit) = config.get("cpu_limit") {
-            cpu_limit
-                .parse::<f64>()
-                .with_context(|| format!("Invalid CPU limit '{cpu_limit}'. Expected a number"))?;
-        }
-
+        self.validate_volumes(config)?;
+        self.validate_environment_variables(config)?;
+        self.validate_ports(config)?;
+        self.validate_restart_policy(config)?;
+        self.validate_numeric_values(config)?;
         Ok(())
     }
 
@@ -305,6 +252,74 @@ impl McpServer for DockerServer {
 }
 
 impl DockerServer {
+    fn validate_volumes(&self, config: &HashMap<String, String>) -> Result<()> {
+        if let Some(volumes) = config.get("volumes") {
+            for volume in volumes.split(',') {
+                let volume = volume.trim();
+                if !volume.is_empty() && !volume.contains(':') {
+                    anyhow::bail!(
+                        "Invalid volume format '{}'. Expected 'host:container' format",
+                        volume
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_environment_variables(&self, config: &HashMap<String, String>) -> Result<()> {
+        if let Some(env_vars) = config.get("environment") {
+            for env_var in env_vars.split(',') {
+                let env_var = env_var.trim();
+                if !env_var.is_empty() && !env_var.contains('=') {
+                    anyhow::bail!(
+                        "Invalid environment variable format '{}'. Expected 'KEY=value' format",
+                        env_var
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_ports(&self, config: &HashMap<String, String>) -> Result<()> {
+        if let Some(ports) = config.get("ports") {
+            for port in ports.split(',') {
+                let port = port.trim();
+                if !port.is_empty() && !port.contains(':') {
+                    anyhow::bail!(
+                        "Invalid port format '{}'. Expected 'host:container' format",
+                        port
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_restart_policy(&self, config: &HashMap<String, String>) -> Result<()> {
+        if let Some(restart_policy) = config.get("restart_policy") {
+            let valid_policies = ["no", "always", "unless-stopped", "on-failure"];
+            if !valid_policies.contains(&restart_policy.as_str()) {
+                anyhow::bail!(
+                    "Invalid restart policy '{}'. Valid options: {}",
+                    restart_policy,
+                    valid_policies.join(", ")
+                );
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_numeric_values(&self, config: &HashMap<String, String>) -> Result<()> {
+        if let Some(cpu_limit) = config.get("cpu_limit") {
+            cpu_limit
+                .parse::<f64>()
+                .with_context(|| format!("Invalid CPU limit '{cpu_limit}'. Expected a number"))?;
+        }
+        Ok(())
+    }
+
     pub fn generate_command_with_config(
         &self,
         config: &HashMap<String, String>,

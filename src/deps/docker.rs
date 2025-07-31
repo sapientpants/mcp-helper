@@ -190,86 +190,89 @@ impl DependencyChecker for DockerChecker {
             requires_compose: self.check_compose,
         };
 
-        // Check if Docker is installed
         let docker_version = self.check_docker_version()?;
-
-        let status = match docker_version {
-            Some(version) => {
-                // Check if Docker daemon is running
-                if !self.check_docker_running()? {
-                    DependencyStatus::ConfigurationRequired {
-                        issue: "Docker is installed but not running".to_string(),
-                        solution: "Start Docker Desktop or run 'sudo systemctl start docker'"
-                            .to_string(),
-                    }
-                } else if let Some(ref min_version) = self.min_version {
-                    // Compare versions
-                    let installed_version = semver::Version::parse(&version)
-                        .with_context(|| format!("Invalid Docker version format: {version}"))?;
-                    let required_version =
-                        semver::Version::parse(min_version).with_context(|| {
-                            format!("Invalid required version format: {min_version}")
-                        })?;
-
-                    if installed_version >= required_version {
-                        // Check Docker Compose if required
-                        if self.check_compose {
-                            match self.check_docker_compose()? {
-                                Some(_compose_version) => DependencyStatus::Installed {
-                                    version: Some(version),
-                                },
-                                None => DependencyStatus::ConfigurationRequired {
-                                    issue: "Docker Compose is not available".to_string(),
-                                    solution: "Install Docker Compose or use Docker Desktop"
-                                        .to_string(),
-                                },
-                            }
-                        } else {
-                            DependencyStatus::Installed {
-                                version: Some(version),
-                            }
-                        }
-                    } else {
-                        DependencyStatus::VersionMismatch {
-                            installed: version,
-                            required: min_version.clone(),
-                        }
-                    }
-                } else {
-                    // Check Docker Compose if required
-                    if self.check_compose {
-                        match self.check_docker_compose()? {
-                            Some(_compose_version) => DependencyStatus::Installed {
-                                version: Some(version),
-                            },
-                            None => DependencyStatus::ConfigurationRequired {
-                                issue: "Docker Compose is not available".to_string(),
-                                solution: "Install Docker Compose or use Docker Desktop"
-                                    .to_string(),
-                            },
-                        }
-                    } else {
-                        DependencyStatus::Installed {
-                            version: Some(version),
-                        }
-                    }
-                }
-            }
-            None => DependencyStatus::Missing,
-        };
-
-        let install_instructions = match status {
-            DependencyStatus::Missing | DependencyStatus::VersionMismatch { .. } => {
-                Some(Self::get_install_instructions())
-            }
-            _ => None,
-        };
+        let status = self.determine_status(docker_version)?;
+        let install_instructions = self.get_install_instructions_if_needed(&status);
 
         Ok(DependencyCheck {
             dependency,
             status,
             install_instructions,
         })
+    }
+}
+
+impl DockerChecker {
+    fn determine_status(&self, docker_version: Option<String>) -> Result<DependencyStatus> {
+        match docker_version {
+            Some(version) => self.check_installed_docker(&version),
+            None => Ok(DependencyStatus::Missing),
+        }
+    }
+
+    fn check_installed_docker(&self, version: &str) -> Result<DependencyStatus> {
+        if !self.check_docker_running()? {
+            return Ok(DependencyStatus::ConfigurationRequired {
+                issue: "Docker is installed but not running".to_string(),
+                solution: "Start Docker Desktop or run 'sudo systemctl start docker'".to_string(),
+            });
+        }
+
+        if let Some(ref min_version) = self.min_version {
+            self.check_version_requirement(version, min_version)
+        } else {
+            self.check_compose_requirement(version)
+        }
+    }
+
+    fn check_version_requirement(
+        &self,
+        version: &str,
+        min_version: &str,
+    ) -> Result<DependencyStatus> {
+        let installed_version = semver::Version::parse(version)
+            .with_context(|| format!("Invalid Docker version format: {version}"))?;
+        let required_version = semver::Version::parse(min_version)
+            .with_context(|| format!("Invalid required version format: {min_version}"))?;
+
+        if installed_version < required_version {
+            return Ok(DependencyStatus::VersionMismatch {
+                installed: version.to_string(),
+                required: min_version.to_string(),
+            });
+        }
+
+        self.check_compose_requirement(version)
+    }
+
+    fn check_compose_requirement(&self, version: &str) -> Result<DependencyStatus> {
+        if !self.check_compose {
+            return Ok(DependencyStatus::Installed {
+                version: Some(version.to_string()),
+            });
+        }
+
+        match self.check_docker_compose()? {
+            Some(_) => Ok(DependencyStatus::Installed {
+                version: Some(version.to_string()),
+            }),
+            None => Ok(DependencyStatus::ConfigurationRequired {
+                issue: "Docker Compose is not available".to_string(),
+                solution: "Install Docker Compose or use Docker Desktop".to_string(),
+            }),
+        }
+    }
+
+    fn get_install_instructions_if_needed(
+        &self,
+        status: &DependencyStatus,
+    ) -> Option<InstallInstructions> {
+        match status {
+            DependencyStatus::Missing | DependencyStatus::VersionMismatch { .. } => {
+                Some(Self::get_install_instructions())
+            }
+            _ => None,
+        }
     }
 }
 

@@ -23,44 +23,53 @@ impl ConfigValidator {
     ) -> ValidationResult {
         let mut errors = Vec::new();
 
-        // Check required fields
+        Self::validate_required_fields(config, required_fields, &mut errors);
+        Self::validate_optional_fields(config, optional_fields, &mut errors);
+        Self::validate_extra_fields(config, required_fields, optional_fields, &mut errors);
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
+    fn validate_required_fields(
+        config: &HashMap<String, String>,
+        required_fields: &[ConfigField],
+        errors: &mut Vec<ValidationError>,
+    ) {
         for field in required_fields {
             match config.get(&field.name) {
-                Some(value) => {
-                    if let Err(e) =
-                        Self::validate_field_value(&field.name, value, &field.field_type)
-                    {
-                        errors.push(ValidationError {
-                            field: field.name.clone(),
-                            message: e.to_string(),
-                        });
-                    }
-                }
-                None => {
-                    errors.push(ValidationError {
-                        field: field.name.clone(),
-                        message: "Required field is missing".to_string(),
-                    });
-                }
+                Some(value) => Self::validate_and_collect_error(field, value, errors),
+                None => errors.push(ValidationError {
+                    field: field.name.clone(),
+                    message: "Required field is missing".to_string(),
+                }),
             }
         }
+    }
 
-        // Check optional fields if present
+    fn validate_optional_fields(
+        config: &HashMap<String, String>,
+        optional_fields: &[ConfigField],
+        errors: &mut Vec<ValidationError>,
+    ) {
         for field in optional_fields {
             if let Some(value) = config.get(&field.name) {
-                if let Err(e) = Self::validate_field_value(&field.name, value, &field.field_type) {
-                    errors.push(ValidationError {
-                        field: field.name.clone(),
-                        message: e.to_string(),
-                    });
-                }
+                Self::validate_and_collect_error(field, value, errors);
             }
         }
+    }
 
-        // Validate extra fields (not in schema)
+    fn validate_extra_fields(
+        config: &HashMap<String, String>,
+        required_fields: &[ConfigField],
+        optional_fields: &[ConfigField],
+        errors: &mut Vec<ValidationError>,
+    ) {
         for (key, value) in config {
-            let is_known = required_fields.iter().any(|f| f.name == *key)
-                || optional_fields.iter().any(|f| f.name == *key);
+            let is_known = Self::is_known_field(key, required_fields, optional_fields);
 
             if !is_known && value.is_empty() {
                 errors.push(ValidationError {
@@ -69,12 +78,28 @@ impl ConfigValidator {
                 });
             }
         }
+    }
 
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
+    fn validate_and_collect_error(
+        field: &ConfigField,
+        value: &str,
+        errors: &mut Vec<ValidationError>,
+    ) {
+        if let Err(e) = Self::validate_field_value(&field.name, value, &field.field_type) {
+            errors.push(ValidationError {
+                field: field.name.clone(),
+                message: e.to_string(),
+            });
         }
+    }
+
+    fn is_known_field(
+        field_name: &str,
+        required_fields: &[ConfigField],
+        optional_fields: &[ConfigField],
+    ) -> bool {
+        required_fields.iter().any(|f| f.name == field_name)
+            || optional_fields.iter().any(|f| f.name == field_name)
     }
 
     /// Validate environment variables in config

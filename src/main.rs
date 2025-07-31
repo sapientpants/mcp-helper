@@ -92,18 +92,28 @@ fn print_not_implemented(command: &str) {
 fn main() {
     let cli = Cli::parse();
 
-    // Initialize logging based on verbosity
+    setup_logging(&cli);
+
+    let result = execute_command(cli);
+
+    handle_result(result);
+}
+
+/// Set up logging based on CLI arguments
+fn setup_logging(cli: &Cli) {
     if let Err(e) = logging::init_logging(cli.verbose) {
         eprintln!("Warning: Failed to initialize logging: {e}");
     }
 
-    // Log system information in verbose mode
     if cli.verbose {
         logging::log_system_info();
         eprintln!("{}", "Verbose mode enabled".dimmed());
     }
+}
 
-    let result = match cli.command {
+/// Execute the requested command
+fn execute_command(cli: Cli) -> anyhow::Result<()> {
+    match cli.command {
         Commands::Run { server, args } => run_server(&server, &args, cli.verbose),
         Commands::Install {
             server,
@@ -111,66 +121,99 @@ fn main() {
             dry_run,
             config,
             batch,
-        } => {
-            use mcp_helper::install::InstallCommand;
+        } => execute_install_command(
+            server,
+            auto_install_deps,
+            dry_run,
+            config,
+            batch,
+            cli.verbose,
+        ),
+        Commands::Setup => execute_setup_command(),
+        Commands::Config { action } => execute_config_command(action),
+        Commands::Doctor => execute_doctor_command(),
+    }
+}
 
-            let mut install = InstallCommand::new(cli.verbose);
-            install = install
-                .with_auto_install_deps(auto_install_deps)
-                .with_dry_run(dry_run)
-                .with_config_overrides(config);
+/// Execute the install command
+fn execute_install_command(
+    server: String,
+    auto_install_deps: bool,
+    dry_run: bool,
+    config: Vec<String>,
+    batch: Option<String>,
+    verbose: bool,
+) -> anyhow::Result<()> {
+    use mcp_helper::install::InstallCommand;
 
-            if let Some(batch_file) = batch {
-                println!(
-                    "{} Installing servers from batch file: {}",
-                    "→".green(),
-                    batch_file.cyan()
-                );
-                install.execute_batch(&batch_file).map_err(|e| match e {
-                    McpError::Other(err) => err,
-                    _ => anyhow::anyhow!("{}", e),
-                })
-            } else {
-                println!("{} Installing MCP server: {}", "→".green(), server.cyan());
-                install.execute(&server).map_err(|e| match e {
-                    McpError::Other(err) => err,
-                    _ => anyhow::anyhow!("{}", e),
-                })
-            }
-        }
-        Commands::Setup => {
-            println!("{}", "🔧 Running MCP Helper setup...".blue().bold());
-            print_not_implemented("Setup");
-            Ok(())
-        }
-        Commands::Config { action } => {
-            match action {
-                ConfigAction::Add { server } => {
-                    println!("{} Adding server to config: {}", "→".green(), server.cyan());
-                    print_not_implemented("Config add");
-                }
-                ConfigAction::List => {
-                    println!("{}", "📋 Configured MCP servers:".blue().bold());
-                    print_not_implemented("Config list");
-                }
-                ConfigAction::Remove { server } => {
-                    println!(
-                        "{} Removing server from config: {}",
-                        "→".green(),
-                        server.cyan()
-                    );
-                    print_not_implemented("Config remove");
-                }
-            }
-            Ok(())
-        }
-        Commands::Doctor => {
-            println!("{}", "🏥 Running MCP diagnostics...".blue().bold());
-            print_not_implemented("Doctor");
-            Ok(())
-        }
-    };
+    let mut install = InstallCommand::new(verbose);
+    install = install
+        .with_auto_install_deps(auto_install_deps)
+        .with_dry_run(dry_run)
+        .with_config_overrides(config);
 
+    if let Some(batch_file) = batch {
+        println!(
+            "{} Installing servers from batch file: {}",
+            "→".green(),
+            batch_file.cyan()
+        );
+        install
+            .execute_batch(&batch_file)
+            .map_err(convert_mcp_error)
+    } else {
+        println!("{} Installing MCP server: {}", "→".green(), server.cyan());
+        install.execute(&server).map_err(convert_mcp_error)
+    }
+}
+
+/// Execute the setup command
+fn execute_setup_command() -> anyhow::Result<()> {
+    println!("{}", "🔧 Running MCP Helper setup...".blue().bold());
+    print_not_implemented("Setup");
+    Ok(())
+}
+
+/// Execute config commands
+fn execute_config_command(action: ConfigAction) -> anyhow::Result<()> {
+    match action {
+        ConfigAction::Add { server } => {
+            println!("{} Adding server to config: {}", "→".green(), server.cyan());
+            print_not_implemented("Config add");
+        }
+        ConfigAction::List => {
+            println!("{}", "📋 Configured MCP servers:".blue().bold());
+            print_not_implemented("Config list");
+        }
+        ConfigAction::Remove { server } => {
+            println!(
+                "{} Removing server from config: {}",
+                "→".green(),
+                server.cyan()
+            );
+            print_not_implemented("Config remove");
+        }
+    }
+    Ok(())
+}
+
+/// Execute the doctor command
+fn execute_doctor_command() -> anyhow::Result<()> {
+    println!("{}", "🏥 Running MCP diagnostics...".blue().bold());
+    print_not_implemented("Doctor");
+    Ok(())
+}
+
+/// Convert McpError to anyhow::Error
+fn convert_mcp_error(e: McpError) -> anyhow::Error {
+    match e {
+        McpError::Other(err) => err,
+        _ => anyhow::anyhow!("{}", e),
+    }
+}
+
+/// Handle the result of command execution
+fn handle_result(result: anyhow::Result<()>) {
     if let Err(e) = result {
         eprintln!();
         match e.downcast::<McpError>() {
