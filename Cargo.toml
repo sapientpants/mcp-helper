@@ -36,3 +36,8 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 rusty-hook = "^0.11"
 assert_cmd = "2.0"
 predicates = "3.0"
+proptest = "1.0"
+quickcheck = "1.0"
+mockall = "0.11"
+serial_test = "2.0"
+criterion = "0.5"

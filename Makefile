@@ -24,7 +24,8 @@ endif
 # Phony targets
 .PHONY: all help clean build build-release test test-all test-unit test-integration \
         run install fmt fmt-check lint lint-all check doc audit hooks dev ci quick-test \
-        bench coverage coverage-ci watch pre-push pre-commit
+        bench coverage coverage-ci coverage-detailed test-property test-security \
+        test-performance test-errors watch pre-push pre-commit
 
 # Help target
 help:
@@ -49,6 +50,13 @@ help:
 	@echo "  hooks          Install/update git hooks"
 	@echo "  install        Install release binary to ~/.cargo/bin"
 	@echo "  run            Run debug binary with example"
+	@echo ""
+	@echo "Test targets:"
+	@echo "  test-errors    Run error handling tests"
+	@echo "  test-security  Run security-focused tests"
+	@echo "  test-property  Run property-based tests"
+	@echo "  test-performance Run performance tests"
+	@echo "  coverage-detailed Generate detailed coverage report"
 
 # Clean target - remove all build artifacts
 clean:
@@ -169,6 +177,34 @@ coverage:
 coverage-ci:
 	@echo "Generating coverage report for CI..."
 	@$(CARGO) tarpaulin --out Html --out Lcov --lib --bins --timeout 600 || (echo "Install cargo-tarpaulin with: cargo install cargo-tarpaulin" && exit 1)
+
+# Detailed coverage report with better exclusions
+coverage-detailed:
+	@echo "Generating detailed coverage report..."
+	@$(CARGO) tarpaulin --out Html --out Lcov --lib --bins --tests --timeout 600 \
+		--exclude-files "tests/common/*" --follow-exec \
+		--ignore-panics --ignore-tests || (echo "Install cargo-tarpaulin with: cargo install cargo-tarpaulin" && exit 1)
+	@$(OPEN_CMD) tarpaulin-report.html
+
+# Run property-based tests
+test-property:
+	@echo "Running property-based tests..."
+	@$(CARGO) test property_ -- --test-threads=1 --nocapture
+
+# Run security-focused tests
+test-security:
+	@echo "Running security tests..."
+	@$(CARGO) test security_ -- --test-threads=1 --nocapture
+
+# Run performance/resource tests
+test-performance:
+	@echo "Running performance tests..."
+	@$(CARGO) test --release perf_ -- --test-threads=1 --nocapture
+
+# Run error handling tests specifically
+test-errors:
+	@echo "Running error handling tests..."
+	@$(CARGO) test error_ -- --test-threads=1 --nocapture
 
 # Watch for changes and rebuild (requires cargo-watch)
 watch:
