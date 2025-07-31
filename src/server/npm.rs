@@ -1,9 +1,10 @@
 use crate::deps::Dependency;
-use crate::server::{
-    detect_server_type, ConfigField, ConfigFieldType, McpServer, ServerMetadata, ServerType,
-};
+use crate::server::{detect_server_type, ConfigField, McpServer, ServerMetadata, ServerType};
 use anyhow::Result;
 use std::collections::HashMap;
+
+#[cfg(test)]
+use crate::server::ConfigFieldType;
 
 #[derive(Debug)]
 pub struct NpmServer {
@@ -91,46 +92,15 @@ impl NpmServer {
     }
 }
 
-fn validate_field_type(field: &ConfigField, value: &str) -> Result<()> {
-    match field.field_type {
-        ConfigFieldType::Number => {
-            value
-                .parse::<f64>()
-                .map_err(|_| anyhow::anyhow!("Field '{}' must be a number", field.name))?;
-        }
-        ConfigFieldType::Boolean => {
-            value
-                .parse::<bool>()
-                .map_err(|_| anyhow::anyhow!("Field '{}' must be true or false", field.name))?;
-        }
-        ConfigFieldType::Path => {
-            if value.is_empty() {
-                anyhow::bail!("Field '{}' (path) cannot be empty", field.name);
-            }
-        }
-        ConfigFieldType::Url => {
-            if !value.starts_with("http://") && !value.starts_with("https://") {
-                anyhow::bail!("Field '{}' must be a valid URL", field.name);
-            }
-        }
-        _ => {} // String type needs no special validation
-    }
-    Ok(())
-}
-
 impl McpServer for NpmServer {
     fn metadata(&self) -> &ServerMetadata {
         &self.metadata
     }
 
     fn validate_config(&self, config: &HashMap<String, String>) -> Result<()> {
-        // Check required fields
-        for field in &self.metadata.required_config {
-            match config.get(&field.name) {
-                Some(value) => validate_field_type(field, value)?,
-                None => anyhow::bail!("Missing required configuration field: {}", field.name),
-            }
-        }
+        use super::validation::ConfigValidation;
+
+        ConfigValidation::validate_required_fields(config, &self.metadata.required_config)?;
 
         Ok(())
     }

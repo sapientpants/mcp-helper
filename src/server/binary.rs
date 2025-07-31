@@ -316,23 +316,10 @@ impl McpServer for BinaryServer {
     }
 
     fn validate_config(&self, config: &HashMap<String, String>) -> Result<()> {
-        // Validate working directory if provided
-        if let Some(working_dir) = config.get("working_directory") {
-            let path = Path::new(working_dir);
-            if !path.exists() {
-                anyhow::bail!("Working directory does not exist: {}", working_dir);
-            }
-            if !path.is_dir() {
-                anyhow::bail!("Working directory is not a directory: {}", working_dir);
-            }
-        }
+        use super::validation::ConfigValidation;
 
-        // Validate timeout if provided
-        if let Some(timeout_str) = config.get("timeout") {
-            timeout_str
-                .parse::<u64>()
-                .with_context(|| format!("Invalid timeout value: {timeout_str}"))?;
-        }
+        ConfigValidation::validate_working_directory(config)?;
+        ConfigValidation::validate_timeout(config)?;
 
         Ok(())
     }

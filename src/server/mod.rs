@@ -56,6 +56,7 @@ pub mod metadata;
 pub mod npm;
 pub mod python;
 pub mod suggestions;
+pub mod validation;
 
 use anyhow::Result;
 use std::collections::HashMap;
