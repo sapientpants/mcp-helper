@@ -20,7 +20,7 @@ pub struct DependencyCheck {
     pub install_instructions: Option<InstallInstructions>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Dependency {
     NodeJs {
         min_version: Option<String>,
@@ -35,7 +35,7 @@ pub enum Dependency {
     Git,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum DependencyStatus {
     Installed { version: Option<String> },
     Missing,

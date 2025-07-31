@@ -1,3 +1,55 @@
+//! MCP server implementations and types.
+//!
+//! This module provides support for different types of MCP servers including NPM packages,
+//! Docker images, GitHub repositories (binaries), and Python packages. Each server type
+//! has specific installation and configuration requirements.
+//!
+//! # Examples
+//!
+//! ## Detecting Server Types
+//!
+//! ```rust,no_run
+//! use mcp_helper::server::{detect_server_type, ServerType};
+//!
+//! // NPM package
+//! let npm_type = detect_server_type("@modelcontextprotocol/server-filesystem");
+//! match npm_type {
+//!     ServerType::Npm { package, version } => {
+//!         println!("NPM package: {}, version: {:?}", package, version);
+//!     }
+//!     _ => {}
+//! }
+//!
+//! // Docker image
+//! let docker_type = detect_server_type("docker:nginx:alpine");
+//! match docker_type {
+//!     ServerType::Docker { image, tag } => {
+//!         println!("Docker image: {}, tag: {:?}", image, tag);
+//!     }
+//!     _ => {}
+//! }
+//! ```
+//!
+//! ## Working with Server Instances
+//!
+//! ```rust,no_run
+//! use mcp_helper::server::{NpmServer, McpServer};
+//!
+//! // Create an NPM server instance
+//! let server = NpmServer::new("@modelcontextprotocol/server-filesystem".to_string(), None);
+//!
+//! // Get server metadata
+//! let metadata = server.metadata();
+//! println!("Server: {}", metadata.name);
+//! println!("Description: {:?}", metadata.description);
+//!
+//! // Check dependencies
+//! let deps = server.dependencies();
+//! for dep in deps {
+//!     println!("Dependency: {:?}", dep);
+//! }
+//! ```
+
 pub mod binary;
 pub mod docker;
 pub mod metadata;

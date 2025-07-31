@@ -6,8 +6,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
-use tempfile::NamedTempFile;
+use std::path::PathBuf;
 
 /// Claude Code MCP client implementation
 pub struct ClaudeCodeClient {
@@ -65,7 +64,7 @@ impl McpClient for ClaudeCodeClient {
         // Read existing config or create new one
         let mut claude_code_config = if config_path.exists() {
             let content = fs::read_to_string(&config_path)?;
-            serde_json::from_str::<ClaudeCodeConfig>(&content)?
+            crate::utils::json_validator::deserialize_json_safe::<ClaudeCodeConfig>(&content)?
         } else {
             ClaudeCodeConfig::default()
         };
@@ -91,14 +90,10 @@ impl McpClient for ClaudeCodeClient {
             servers.insert(name.to_string(), claude_code_server);
         }
 
-        // Write back to file atomically
+        // Write back to file atomically with secure permissions
         let json = serde_json::to_string_pretty(&claude_code_config)?;
-        let temp_file =
-            NamedTempFile::new_in(config_path.parent().unwrap_or_else(|| Path::new(".")))?;
-        fs::write(temp_file.path(), &json).context("Failed to write config to temporary file")?;
-        temp_file
-            .persist(&config_path)
-            .with_context(|| format!("Failed to persist config to {config_path:#?}"))?;
+        crate::utils::secure_file::write_json_secure(&config_path, &json)
+            .with_context(|| format!("Failed to write config to {config_path:#?}"))?;
 
         Ok(())
     }
@@ -111,7 +106,8 @@ impl McpClient for ClaudeCodeClient {
         }
 
         let content = fs::read_to_string(&config_path)?;
-        let claude_code_config: ClaudeCodeConfig = serde_json::from_str(&content)?;
+        let claude_code_config: ClaudeCodeConfig =
+            crate::utils::json_validator::deserialize_json_safe(&content)?;
 
         // Convert from Claude Code's format
         let mut servers = HashMap::new();
@@ -271,7 +267,7 @@ mod tests {
             "fontSize": 14,
             "otherSetting": true
         }"#;
-        fs::write(&config_path, existing_config).unwrap();
+        crate::utils::secure_file::write_json_secure(&config_path, existing_config).unwrap();
 
         let config = ServerConfig {
             command: "test".to_string(),
@@ -354,7 +350,7 @@ mod tests {
                 }
             }
         }"#;
-        fs::write(&config_path, existing_config).unwrap();
+        crate::utils::secure_file::write_json_secure(&config_path, existing_config).unwrap();
 
         // Add a new MCP server
         let mut env = HashMap::new();
@@ -370,7 +366,8 @@ mod tests {
 
         // Read the config back and parse it
         let content = fs::read_to_string(&config_path).unwrap();
-        let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
+        let parsed: serde_json::Value =
+            crate::utils::json_validator::parse_json_safe(&content).unwrap();
 
         // Verify all rich user data is preserved
         assert_eq!(parsed["numStartups"], 369);

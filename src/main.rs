@@ -1,15 +1,11 @@
 use clap::{Parser, Subcommand};
-use colored::*;
+use colored::Colorize;
 use std::env;
 
 mod runner;
 
-// Import Platform from runner module
-use runner::Platform;
-
 // Import from mcp_helper lib
 use mcp_helper::error::McpError;
-use mcp_helper::install::InstallCommand;
 use mcp_helper::logging;
 
 #[derive(Parser)]
@@ -116,6 +112,8 @@ fn main() {
             config,
             batch,
         } => {
+            use mcp_helper::install::InstallCommand;
+
             let mut install = InstallCommand::new(cli.verbose);
             install = install
                 .with_auto_install_deps(auto_install_deps)
@@ -207,18 +205,18 @@ fn run_server(server: &str, args: &[String], verbose: bool) -> anyhow::Result<()
     Ok(())
 }
 
-fn detect_platform() -> Platform {
+fn detect_platform() -> runner::Platform {
     match env::consts::OS {
-        "windows" => Platform::Windows,
-        "macos" => Platform::MacOS,
-        "linux" => Platform::Linux,
+        "windows" => runner::Platform::Windows,
+        "macos" => runner::Platform::MacOS,
+        "linux" => runner::Platform::Linux,
         _ => {
             eprintln!(
                 "{} Unknown platform: {}, defaulting to Linux behavior",
                 "⚠".yellow(),
                 env::consts::OS
             );
-            Platform::Linux
+            runner::Platform::Linux
         }
     }
 }
@@ -232,7 +230,7 @@ mod tests {
         let platform = detect_platform();
         // Just ensure it returns something valid
         match platform {
-            Platform::Windows | Platform::MacOS | Platform::Linux => {}
+            runner::Platform::Windows | runner::Platform::MacOS | runner::Platform::Linux => {}
         }
     }
 
@@ -260,10 +258,10 @@ mod tests {
     fn test_platform_detection_current_os() {
         let platform = detect_platform();
         #[cfg(target_os = "windows")]
-        assert_eq!(platform, Platform::Windows);
+        assert_eq!(platform, runner::Platform::Windows);
         #[cfg(target_os = "macos")]
-        assert_eq!(platform, Platform::MacOS);
+        assert_eq!(platform, runner::Platform::MacOS);
         #[cfg(target_os = "linux")]
-        assert_eq!(platform, Platform::Linux);
+        assert_eq!(platform, runner::Platform::Linux);
     }
 }

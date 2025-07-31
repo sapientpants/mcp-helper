@@ -114,8 +114,8 @@ impl MetadataLoader {
             )
         })?;
 
-        let package: PackageJson =
-            serde_json::from_str(&content).context("Failed to parse package.json")?;
+        let package: PackageJson = crate::utils::json_validator::deserialize_json_safe(&content)
+            .context("Failed to parse package.json")?;
 
         let metadata = self.convert_package_json_to_metadata(package)?;
 

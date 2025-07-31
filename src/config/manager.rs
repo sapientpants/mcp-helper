@@ -266,7 +266,8 @@ impl ConfigManager {
         let contents =
             serde_json::to_string_pretty(history).context("Failed to serialize history")?;
 
-        fs::write(&history_file, contents).context("Failed to write history file")?;
+        crate::utils::secure_file::write_json_secure(&history_file, &contents)
+            .context("Failed to write history file")?;
 
         Ok(())
     }

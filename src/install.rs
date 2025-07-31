@@ -1,8 +1,43 @@
+//! MCP server installation command implementation.
+//!
+//! This module contains the main installation logic for MCP servers. It handles
+//! dependency checking, security validation, client detection, server configuration,
+//! and the complete installation workflow.
+//!
+//! # Features
+//!
+//! - **Multi-Server Support**: NPM packages, Docker images, GitHub repos, binaries
+//! - **Multi-Client Integration**: Installs to multiple MCP clients simultaneously
+//! - **Dependency Management**: Automatic checking and optional installation
+//! - **Security Validation**: Validates server sources and warns about risks
+//! - **Interactive Configuration**: Guides users through server setup
+//! - **Batch Installation**: Install multiple servers from a file
+//! - **Dry Run Mode**: Preview changes without making them
+//!
+//! # Example
+//!
+//! ```rust,no_run
+//! use mcp_helper::install::InstallCommand;
+//!
+//! // Create installer with verbose output
+//! let mut installer = InstallCommand::new(true);
+//!
+//! // Configure installer options
+//! installer = installer
+//!     .with_auto_install_deps(true)
+//!     .with_dry_run(false);
+//!
+//! // Install a server
+//! installer.execute("@modelcontextprotocol/server-filesystem")?;
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+
 use colored::Colorize;
 use dialoguer::{Confirm, Input};
 use std::collections::HashMap;
 use std::fs;
 
+use crate::cache::CacheManager;
 use crate::client::{detect_clients, ClientRegistry, ServerConfig};
 use crate::config::ConfigManager;
 use crate::deps::{Dependency, DependencyInstaller, DependencyStatus};
@@ -13,30 +48,52 @@ use crate::server::{
     detect_server_type, ConfigField, ConfigFieldType, McpServer, ServerSuggestions, ServerType,
 };
 
+/// Main installation command for MCP servers.
+///
+/// The InstallCommand handles the complete workflow of installing MCP servers:
+/// dependency checking, security validation, client detection, configuration,
+/// and server installation across multiple MCP clients.
 pub struct InstallCommand {
+    /// Registry of available MCP clients
     client_registry: ClientRegistry,
+    /// Configuration manager for atomic updates and rollback
     config_manager: ConfigManager,
+    /// Security validator for server source validation
     security_validator: SecurityValidator,
+    /// Cache manager for dependency and metadata caching
+    cache_manager: CacheManager,
+    /// Whether to show verbose output
     verbose: bool,
+    /// Whether to automatically install missing dependencies
     auto_install_deps: bool,
+    /// Whether to perform a dry run (no actual changes)
     dry_run: bool,
+    /// Server suggestion engine for alternatives
     suggestions: ServerSuggestions,
+    /// Configuration overrides from command line (key=value pairs)
     config_overrides: HashMap<String, String>,
 }
 
 impl InstallCommand {
+    /// Create a new installation command with the specified verbosity.
+    ///
+    /// This constructor automatically detects and registers all available MCP clients,
+    /// initializes the configuration manager, and sets up default options.
+    ///
+    /// # Arguments
+    /// * `verbose` - Whether to enable verbose output during installation
+    ///
+    /// # Returns
+    /// A new InstallCommand ready for configuration and execution
     pub fn new(verbose: bool) -> Self {
-        let mut client_registry = ClientRegistry::new();
-
-        // Register clients
-        for client in detect_clients() {
-            client_registry.register(client);
-        }
+        // Create an empty registry - clients will be loaded on demand
+        let client_registry = ClientRegistry::new();
 
         Self {
             client_registry,
             config_manager: ConfigManager::new().expect("Failed to create config manager"),
             security_validator: SecurityValidator::new(),
+            cache_manager: CacheManager::new().unwrap_or_else(|_| CacheManager::default()),
             verbose,
             auto_install_deps: false,
             dry_run: false,
@@ -45,16 +102,49 @@ impl InstallCommand {
         }
     }
 
+    /// Enable or disable automatic dependency installation.
+    ///
+    /// When enabled, the installer will attempt to automatically install
+    /// missing dependencies (Node.js, Docker, Python, etc.) using the
+    /// system package manager.
+    ///
+    /// # Arguments
+    /// * `auto_install` - Whether to automatically install missing dependencies
     pub fn with_auto_install_deps(mut self, auto_install: bool) -> Self {
         self.auto_install_deps = auto_install;
         self
     }
 
+    /// Enable or disable dry run mode.
+    ///
+    /// In dry run mode, the installer will show what would be done
+    /// without making any actual changes to the system or configuration files.
+    ///
+    /// # Arguments
+    /// * `dry_run` - Whether to perform a dry run (no actual changes)
     pub fn with_dry_run(mut self, dry_run: bool) -> Self {
         self.dry_run = dry_run;
         self
     }
 
+    /// Set configuration overrides from command-line arguments.
+    ///
+    /// Configuration overrides allow non-interactive installation by
+    /// providing server configuration values as key=value pairs.
+    ///
+    /// # Arguments
+    /// * `config_args` - Vector of strings in "key=value" format
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// use mcp_helper::install::InstallCommand;
+    ///
+    /// let installer = InstallCommand::new(false)
+    ///     .with_config_overrides(vec![
+    ///         "allowedDirectories=/home/user/docs".to_string(),
+    ///         "allowedFileTypes=.md,.txt".to_string(),
+    ///     ]);
+    /// ```
     pub fn with_config_overrides(mut self, config_args: Vec<String>) -> Self {
         self.config_overrides = Self::parse_config_args(&config_args);
         self
@@ -78,6 +168,30 @@ impl InstallCommand {
         config
     }
 
+    /// Execute the installation of a single MCP server.
+    ///
+    /// This is the main entry point for installing an MCP server. It performs
+    /// the complete installation workflow including dependency checking,
+    /// security validation, client selection, configuration, and installation.
+    ///
+    /// # Arguments
+    /// * `server_name` - Name or specification of the server to install
+    ///   - NPM packages: `@org/package-name` or `package-name`
+    ///   - Docker images: `docker:image:tag`
+    ///   - GitHub repos: `user/repo` or `https://github.com/user/repo`
+    ///   - Binaries: `https://example.com/path/to/binary`
+    ///
+    /// # Returns
+    /// `Ok(())` if installation succeeds, or an error describing what went wrong
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// use mcp_helper::install::InstallCommand;
+    ///
+    /// let mut installer = InstallCommand::new(true);
+    /// installer.execute("@modelcontextprotocol/server-filesystem")?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
     pub fn execute(&mut self, server_name: &str) -> Result<()> {
         if self.verbose {
             eprintln!("{} Detecting server type for: {}", "ℹ".blue(), server_name);
@@ -131,6 +245,35 @@ impl InstallCommand {
         Ok(())
     }
 
+    /// Execute batch installation of multiple MCP servers from a file.
+    ///
+    /// Reads a file containing server specifications (one per line) and installs
+    /// each server sequentially. Empty lines and lines starting with '#' are ignored.
+    /// If any server fails to install, the process continues with the remaining servers.
+    ///
+    /// # Arguments
+    /// * `batch_file` - Path to the batch file containing server specifications
+    ///
+    /// # Batch File Format
+    /// ```text
+    /// # MCP servers to install
+    /// @modelcontextprotocol/server-filesystem
+    /// @anthropic/mcp-server-slack
+    /// docker:postgres:13
+    /// user/custom-mcp-server
+    /// ```
+    ///
+    /// # Returns
+    /// `Ok(())` if the batch file was processed, regardless of individual server success/failure
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// use mcp_helper::install::InstallCommand;
+    ///
+    /// let mut installer = InstallCommand::new(true);
+    /// installer.execute_batch("servers.txt")?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
     pub fn execute_batch(&mut self, batch_file: &str) -> Result<()> {
         let batch_content = fs::read_to_string(batch_file).map_err(|e| {
             McpError::Other(anyhow::anyhow!(
@@ -403,6 +546,16 @@ impl InstallCommand {
 
         let dep_name = Self::get_dependency_name(&check.dependency);
 
+        // Cache the result for future use
+        if let Err(e) = self
+            .cache_manager
+            .cache_dependency_status(check.dependency.clone(), check.status.clone())
+        {
+            if self.verbose {
+                eprintln!("{} Failed to cache dependency status: {}", "⚠".yellow(), e);
+            }
+        }
+
         match &check.status {
             DependencyStatus::Installed { version } => {
                 Self::handle_installed_dependency(dep_name, version)
@@ -552,7 +705,22 @@ impl InstallCommand {
         Ok(())
     }
 
-    fn select_clients(&self) -> Result<Vec<String>> {
+    fn ensure_clients_loaded(&mut self) {
+        if self.client_registry.clients.is_empty() {
+            if self.verbose {
+                eprintln!("{} Loading MCP clients...", "ℹ".blue());
+            }
+
+            // Load clients on demand
+            for client in detect_clients() {
+                self.client_registry.register(client);
+            }
+        }
+    }
+
+    fn select_clients(&mut self) -> Result<Vec<String>> {
+        // Ensure clients are loaded
+        self.ensure_clients_loaded();
         let installed_clients: Vec<String> = self
             .client_registry
             .detect_installed()

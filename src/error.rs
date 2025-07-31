@@ -1,3 +1,25 @@
+//! Error handling for MCP Helper operations.
+//!
+//! This module provides comprehensive error types that give users actionable information
+//! about what went wrong and how to fix it. All errors are designed to be user-friendly
+//! with colored output and platform-specific instructions.
+//!
+//! # Examples
+//!
+//! ```rust,no_run
+//! use mcp_helper::error::{McpError, Result};
+//! use mcp_helper::deps::InstallInstructions;
+//!
+//! // Create a missing dependency error with install instructions
+//! let error = McpError::missing_dependency(
+//!     "Node.js",
+//!     Some("18.0.0".to_string()),
+//!     InstallInstructions::default()
+//! );
+//!
+//! println!("{}", error); // Displays colored, helpful error message
+//! ```
+
 use colored::Colorize;
 use std::fmt;
 
@@ -6,46 +28,120 @@ use crate::deps::InstallInstructions;
 pub mod builder;
 pub use builder::ErrorBuilder;
 
+/// Comprehensive error type for MCP Helper operations.
+///
+/// Each error variant provides specific context and actionable guidance to help users
+/// resolve issues. Errors are formatted with colors and clear instructions.
 #[derive(Debug)]
 pub enum McpError {
+    /// A required dependency (Node.js, Docker, Python, etc.) is missing.
+    ///
+    /// Provides platform-specific installation instructions to help users
+    /// install the missing dependency.
     MissingDependency {
+        /// Name of the missing dependency
         dependency: String,
+        /// Required version (if any)
         required_version: Option<String>,
+        /// Platform-specific installation instructions
         install_instructions: Box<InstallInstructions>,
     },
+
+    /// A dependency is installed but doesn't meet version requirements.
+    ///
+    /// Shows current vs required version and provides upgrade instructions.
     VersionMismatch {
+        /// Name of the dependency with version issues
         dependency: String,
+        /// Currently installed version
         current_version: String,
+        /// Version required by the server
         required_version: String,
+        /// Platform-specific upgrade instructions
         upgrade_instructions: Box<InstallInstructions>,
     },
+
+    /// A server requires configuration that wasn't provided.
+    ///
+    /// Lists missing configuration fields with descriptions to guide users.
     ConfigurationRequired {
+        /// Name of the server requiring configuration
         server_name: String,
+        /// List of missing configuration field names
         missing_fields: Vec<String>,
+        /// Field descriptions as (name, description) pairs
         field_descriptions: Vec<(String, String)>,
     },
+
+    /// No MCP clients were found or selected for installation.
+    ///
+    /// Shows available clients and provides installation guidance.
     ClientNotFound {
+        /// Name of the client that wasn't found
         client_name: String,
+        /// List of available/detected clients
         available_clients: Vec<String>,
+        /// Instructions for installing the client
         install_guidance: String,
     },
+
+    /// Configuration file parsing or validation error.
+    ///
+    /// Indicates issues with JSON syntax, file permissions, or content validation.
     ConfigError {
+        /// Path to the configuration file
         path: String,
+        /// Specific error message
         message: String,
     },
+
+    /// Server-specific error during installation or execution.
+    ///
+    /// Covers issues like invalid server names, download failures, or runtime errors.
     ServerError {
+        /// Name of the server that caused the error
         server_name: String,
+        /// Specific error message
         message: String,
     },
+
+    /// File system I/O operation failed.
+    ///
+    /// Covers file reading, writing, permission errors, and path issues.
     IoError {
+        /// Description of the operation that failed
         operation: String,
+        /// Path involved in the operation (if applicable)
         path: Option<String>,
+        /// Underlying I/O error
         source: std::io::Error,
     },
+
+    /// Catch-all for other error types.
+    ///
+    /// Used for wrapping errors from external libraries or unexpected conditions.
     Other(anyhow::Error),
 }
 
 impl McpError {
+    /// Create a missing dependency error with installation instructions.
+    ///
+    /// # Arguments
+    /// * `dependency` - Name of the missing dependency (e.g., "Node.js", "Docker")
+    /// * `required_version` - Optional version requirement (e.g., Some("18.0.0".to_string()))
+    /// * `install_instructions` - Platform-specific installation methods
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// use mcp_helper::error::McpError;
+    /// use mcp_helper::deps::InstallInstructions;
+    ///
+    /// let error = McpError::missing_dependency(
+    ///     "Docker",
+    ///     None,
+    ///     InstallInstructions::default()
+    /// );
+    /// ```
     pub fn missing_dependency(
         dependency: impl Into<String>,
         required_version: Option<String>,
@@ -58,6 +154,13 @@ impl McpError {
         }
     }
 
+    /// Create a version mismatch error with upgrade instructions.
+    ///
+    /// # Arguments
+    /// * `dependency` - Name of the dependency with version issues
+    /// * `current_version` - Currently installed version
+    /// * `required_version` - Version required by the server
+    /// * `upgrade_instructions` - Platform-specific upgrade methods
     pub fn version_mismatch(
         dependency: impl Into<String>,
         current_version: impl Into<String>,
@@ -72,6 +175,12 @@ impl McpError {
         }
     }
 
+    /// Create a configuration required error with field descriptions.
+    ///
+    /// # Arguments
+    /// * `server_name` - Name of the server requiring configuration
+    /// * `missing_fields` - List of missing configuration field names
+    /// * `field_descriptions` - Field descriptions as (name, description) pairs
     pub fn configuration_required(
         server_name: impl Into<String>,
         missing_fields: Vec<String>,
@@ -84,6 +193,12 @@ impl McpError {
         }
     }
 
+    /// Create a client not found error with available alternatives.
+    ///
+    /// # Arguments
+    /// * `client_name` - Name of the client that wasn't found
+    /// * `available_clients` - List of detected/available clients
+    /// * `install_guidance` - Instructions for installing the client
     pub fn client_not_found(
         client_name: impl Into<String>,
         available_clients: Vec<String>,
@@ -96,6 +211,11 @@ impl McpError {
         }
     }
 
+    /// Create a configuration file error.
+    ///
+    /// # Arguments
+    /// * `path` - Path to the configuration file
+    /// * `message` - Specific error message describing the issue
     pub fn config_error(path: impl Into<String>, message: impl Into<String>) -> Self {
         Self::ConfigError {
             path: path.into(),
@@ -103,6 +223,11 @@ impl McpError {
         }
     }
 
+    /// Create a server-specific error.
+    ///
+    /// # Arguments
+    /// * `server_name` - Name of the server that caused the error
+    /// * `message` - Specific error message describing the issue
     pub fn server_error(server_name: impl Into<String>, message: impl Into<String>) -> Self {
         Self::ServerError {
             server_name: server_name.into(),
@@ -110,6 +235,12 @@ impl McpError {
         }
     }
 
+    /// Create an I/O operation error.
+    ///
+    /// # Arguments
+    /// * `operation` - Description of the operation that failed
+    /// * `path` - Optional path involved in the operation
+    /// * `source` - Underlying I/O error
     pub fn io_error(
         operation: impl Into<String>,
         path: Option<String>,
@@ -353,4 +484,18 @@ impl From<dialoguer::Error> for McpError {
     }
 }
 
+/// A type alias for [`std::result::Result`] with [`McpError`] as the error type.
+///
+/// This is the standard result type used throughout MCP Helper for operations
+/// that can fail with user-friendly error messages.
+///
+/// # Example
+/// ```rust,no_run
+/// use mcp_helper::error::Result;
+///
+/// fn install_server(name: &str) -> Result<()> {
+///     // Installation logic here
+///     Ok(())
+/// }
+/// ```
 pub type Result<T> = std::result::Result<T, McpError>;

@@ -6,8 +6,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
-use tempfile::NamedTempFile;
+use std::path::PathBuf;
 
 /// Cursor MCP client implementation
 pub struct CursorClient {
@@ -70,7 +69,7 @@ impl McpClient for CursorClient {
         // Read existing config or create new one
         let mut cursor_config = if config_path.exists() {
             let content = fs::read_to_string(&config_path)?;
-            serde_json::from_str::<CursorConfig>(&content)?
+            crate::utils::json_validator::deserialize_json_safe::<CursorConfig>(&content)?
         } else {
             CursorConfig::default()
         };
@@ -88,14 +87,10 @@ impl McpClient for CursorClient {
             .servers
             .insert(name.to_string(), cursor_server);
 
-        // Write back to file atomically
+        // Write back to file atomically with secure permissions
         let json = serde_json::to_string_pretty(&cursor_config)?;
-        let temp_file =
-            NamedTempFile::new_in(config_path.parent().unwrap_or_else(|| Path::new(".")))?;
-        fs::write(temp_file.path(), &json).context("Failed to write config to temporary file")?;
-        temp_file
-            .persist(&config_path)
-            .with_context(|| format!("Failed to persist config to {config_path:#?}"))?;
+        crate::utils::secure_file::write_json_secure(&config_path, &json)
+            .with_context(|| format!("Failed to write config to {config_path:#?}"))?;
 
         Ok(())
     }
@@ -108,7 +103,8 @@ impl McpClient for CursorClient {
         }
 
         let content = fs::read_to_string(&config_path)?;
-        let cursor_config: CursorConfig = serde_json::from_str(&content)?;
+        let cursor_config: CursorConfig =
+            crate::utils::json_validator::deserialize_json_safe(&content)?;
 
         // Convert from Cursor's format
         let mut servers = HashMap::new();

@@ -6,8 +6,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
-use tempfile::NamedTempFile;
+use std::path::PathBuf;
 
 /// Windsurf (Codeium) MCP client implementation
 pub struct WindsurfClient {
@@ -70,7 +69,7 @@ impl McpClient for WindsurfClient {
         // Read existing config or create new one
         let mut windsurf_config = if config_path.exists() {
             let content = fs::read_to_string(&config_path)?;
-            serde_json::from_str::<WindsurfConfig>(&content)?
+            crate::utils::json_validator::deserialize_json_safe::<WindsurfConfig>(&content)?
         } else {
             WindsurfConfig::default()
         };
@@ -93,14 +92,10 @@ impl McpClient for WindsurfClient {
             .mcp_servers
             .insert(name.to_string(), windsurf_server);
 
-        // Write back to file atomically
+        // Write back to file atomically with secure permissions
         let json = serde_json::to_string_pretty(&windsurf_config)?;
-        let temp_file =
-            NamedTempFile::new_in(config_path.parent().unwrap_or_else(|| Path::new(".")))?;
-        fs::write(temp_file.path(), &json).context("Failed to write config to temporary file")?;
-        temp_file
-            .persist(&config_path)
-            .with_context(|| format!("Failed to persist config to {config_path:#?}"))?;
+        crate::utils::secure_file::write_json_secure(&config_path, &json)
+            .with_context(|| format!("Failed to write config to {config_path:#?}"))?;
 
         Ok(())
     }
@@ -113,7 +108,8 @@ impl McpClient for WindsurfClient {
         }
 
         let content = fs::read_to_string(&config_path)?;
-        let windsurf_config: WindsurfConfig = serde_json::from_str(&content)?;
+        let windsurf_config: WindsurfConfig =
+            crate::utils::json_validator::deserialize_json_safe(&content)?;
 
         // Convert from Windsurf's format
         let mut servers = HashMap::new();

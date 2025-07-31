@@ -1,7 +1,65 @@
 use anyhow::{Context, Result};
 use url::Url;
 
-/// Security validation for MCP server sources
+/// Security validation for MCP server sources.
+///
+/// The SecurityValidator checks server sources (URLs, NPM packages, Docker images)
+/// against trusted registries and warns about potentially unsafe sources.
+///
+/// # Examples
+///
+/// ## Basic URL Validation
+///
+/// ```rust,no_run
+/// use mcp_helper::security::SecurityValidator;
+///
+/// let validator = SecurityValidator::new();
+///
+/// // Validate a GitHub URL (trusted)
+/// let result = validator.validate_url("https://github.com/user/repo")?;
+/// assert!(result.is_trusted);
+/// assert!(result.warnings.is_empty());
+///
+/// // Validate an unknown domain (untrusted)
+/// let result = validator.validate_url("https://example.com/server")?;
+/// assert!(!result.is_trusted);
+/// assert!(!result.warnings.is_empty());
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+///
+/// ## NPM Package Validation
+///
+/// ```rust,no_run
+/// use mcp_helper::security::SecurityValidator;
+///
+/// let validator = SecurityValidator::new();
+///
+/// // Valid package name
+/// let result = validator.validate_npm_package("@modelcontextprotocol/server-filesystem")?;
+/// assert!(result.is_trusted);
+///
+/// // Suspicious package name
+/// let result = validator.validate_npm_package("rm")?;
+/// assert!(!result.warnings.is_empty());
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+///
+/// ## Docker Image Validation
+///
+/// ```rust,no_run
+/// use mcp_helper::security::SecurityValidator;
+///
+/// let validator = SecurityValidator::new();
+///
+/// // Official Docker image
+/// let result = validator.validate_docker_image("nginx")?;
+/// assert!(result.is_trusted);
+///
+/// // User image from trusted registry
+/// let result = validator.validate_docker_image("github.com/user/app")?;
+/// assert!(result.is_trusted);
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
 pub struct SecurityValidator {
     /// List of trusted registries/domains
     trusted_domains: Vec<String>,
@@ -135,7 +193,10 @@ impl SecurityValidator {
         }
 
         // Check for very short or unusual names that might be typosquatting
-        if package_name.len() < 3 && !package_name.starts_with('@') && !suspicious_names.contains(&package_name) {
+        if package_name.len() < 3
+            && !package_name.starts_with('@')
+            && !suspicious_names.contains(&package_name)
+        {
             validation
                 .warnings
                 .push("Very short package names might be typosquatting attempts.".to_string());

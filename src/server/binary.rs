@@ -1,6 +1,8 @@
+use crate::cache::CacheManager;
 use crate::deps::{Dependency, DependencyChecker, DependencyStatus};
 use crate::server::{ConfigField, ConfigFieldType, McpServer, ServerMetadata, ServerType};
 use anyhow::{Context, Result};
+use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::blocking::Client;
 use serde::Deserialize;
@@ -170,7 +172,10 @@ impl BinaryServer {
         );
     }
 
-    pub fn download_and_install(&mut self) -> Result<PathBuf> {
+    pub fn download_and_install(
+        &mut self,
+        cache_manager: Option<&CacheManager>,
+    ) -> Result<PathBuf> {
         let bin_dir = self.get_bin_directory()?;
         fs::create_dir_all(&bin_dir)?;
 
@@ -183,8 +188,24 @@ impl BinaryServer {
 
         let binary_path = bin_dir.join(filename);
 
-        // Download the binary
-        self.download_binary(&binary_path)?;
+        // Check cache first
+        let should_download = if let Some(cache_mgr) = cache_manager {
+            if let Some(cached_path) = cache_mgr.get_cached_download(&self.url) {
+                println!("  {} Using cached download", "ℹ".blue());
+                // Copy from cache to final location
+                fs::copy(&cached_path, &binary_path).context("Failed to copy from cache")?;
+                false
+            } else {
+                true
+            }
+        } else {
+            true
+        };
+
+        if should_download {
+            // Download the binary
+            self.download_binary(&binary_path, cache_manager)?;
+        }
 
         // Verify checksum if provided
         if let Some(expected_checksum) = &self.checksum {
@@ -215,7 +236,11 @@ impl BinaryServer {
         Ok(home.join(".mcp").join("bin"))
     }
 
-    fn download_binary(&self, output_path: &Path) -> Result<()> {
+    fn download_binary(
+        &self,
+        output_path: &Path,
+        cache_manager: Option<&CacheManager>,
+    ) -> Result<()> {
         let client = Client::new();
         let response = client
             .get(&self.url)
@@ -244,6 +269,21 @@ impl BinaryServer {
 
         pb.set_position(content.len() as u64);
         pb.finish_with_message("Download complete");
+
+        // Cache the download if cache manager is available
+        if let Some(cache_mgr) = cache_manager {
+            let cache_dir = cache_mgr.downloads_dir();
+            if let Err(e) = fs::create_dir_all(&cache_dir) {
+                eprintln!("{} Failed to create cache directory: {}", "⚠".yellow(), e);
+            } else {
+                let cache_filename = CacheManager::url_to_filename(&self.url);
+                let cache_path = cache_dir.join(cache_filename);
+
+                if let Err(e) = fs::copy(output_path, &cache_path) {
+                    eprintln!("{} Failed to cache download: {}", "⚠".yellow(), e);
+                }
+            }
+        }
 
         Ok(())
     }

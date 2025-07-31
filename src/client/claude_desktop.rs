@@ -4,8 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
-use tempfile::NamedTempFile;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 pub struct ClaudeDesktopClient {
@@ -97,7 +96,7 @@ impl ClaudeDesktopClient {
         let content = fs::read_to_string(&self.config_path)
             .with_context(|| format!("Failed to read config from {:#?}", self.config_path))?;
 
-        serde_json::from_str(&content)
+        crate::utils::json_validator::deserialize_json_safe(&content)
             .with_context(|| format!("Failed to parse JSON from {:#?}", self.config_path))
     }
 
@@ -117,15 +116,9 @@ impl ClaudeDesktopClient {
         let json =
             serde_json::to_string_pretty(config).context("Failed to serialize config to JSON")?;
 
-        // Write atomically using a temporary file
-        let temp_file =
-            NamedTempFile::new_in(self.config_path.parent().unwrap_or_else(|| Path::new(".")))?;
-
-        fs::write(temp_file.path(), json).context("Failed to write config to temporary file")?;
-
-        temp_file
-            .persist(&self.config_path)
-            .with_context(|| format!("Failed to persist config to {:#?}", self.config_path))?;
+        // Use secure file writing with proper permissions
+        crate::utils::secure_file::write_json_secure(&self.config_path, &json)
+            .with_context(|| format!("Failed to write config to {:#?}", self.config_path))?;
 
         Ok(())
     }
