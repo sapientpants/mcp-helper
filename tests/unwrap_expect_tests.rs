@@ -10,7 +10,6 @@ use mcp_helper::runner::{Platform, ServerRunner};
 use serial_test::serial;
 use std::env;
 use std::fs;
-use std::path::PathBuf;
 use tempfile::TempDir;
 
 /// Test ConfigManager creation failure scenarios
@@ -374,6 +373,7 @@ fn test_cache_corrupt_json_handling() {
 fn test_runner_non_utf8_paths() {
     use std::ffi::OsStr;
     use std::os::unix::ffi::OsStrExt;
+    use std::path::PathBuf;
 
     let platform = Platform::Linux; // Unix test
     let runner = ServerRunner::new(platform, false);
