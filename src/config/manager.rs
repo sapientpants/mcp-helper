@@ -335,9 +335,9 @@ mod tests {
     fn test_apply_and_rollback() {
         let temp_dir = TempDir::new().unwrap();
         let unique_path = temp_dir.path().join(format!(
-            "apply_rollback_{}_{:?}",
+            "apply_rollback_{}_{}",
             std::process::id(),
-            std::thread::current().id()
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
         ));
         std::fs::create_dir_all(&unique_path).unwrap();
         std::env::set_var("XDG_DATA_HOME", &unique_path);
@@ -384,6 +384,9 @@ mod tests {
         // Verify rollback worked
         let servers = client.list_servers().unwrap();
         assert_eq!(servers["test-server"].args.len(), 1);
+
+        // Clean up environment variable
+        std::env::remove_var("XDG_DATA_HOME");
     }
 
     #[test]
@@ -416,9 +419,9 @@ mod tests {
     fn test_history_filtering() {
         let temp_dir = TempDir::new().unwrap();
         let unique_path = temp_dir.path().join(format!(
-            "history_filtering_{}_{:?}",
+            "history_filtering_{}_{}",
             std::process::id(),
-            std::thread::current().id()
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
         ));
         std::fs::create_dir_all(&unique_path).unwrap();
         std::env::set_var("XDG_DATA_HOME", &unique_path);
@@ -461,6 +464,14 @@ mod tests {
         manager.save_snapshot(&snapshot1).unwrap();
         manager.save_snapshot(&snapshot2).unwrap();
 
+        // Verify snapshots were saved
+        let all_history = manager.load_history().unwrap();
+        assert_eq!(
+            all_history.snapshots.len(),
+            2,
+            "Should have saved 2 snapshots"
+        );
+
         // Test filtering by client
         let history = manager.get_history(Some("client1"), None).unwrap();
         assert_eq!(history.len(), 1);
@@ -469,5 +480,8 @@ mod tests {
         // Test filtering by server
         let history = manager.get_history(None, Some("server1")).unwrap();
         assert_eq!(history.len(), 2);
+
+        // Clean up environment variable
+        std::env::remove_var("XDG_DATA_HOME");
     }
 }
