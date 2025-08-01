@@ -111,17 +111,12 @@ impl McpClient for MockClient {
 /// Returns both the ConfigManager and the TempDir (to keep it alive)
 pub fn create_isolated_config_manager() -> (mcp_helper::config::ConfigManager, TempDir) {
     let temp_dir = TempDir::new().unwrap();
-    let unique_id = format!(
-        "test_{}_{:?}",
-        std::process::id(),
-        std::thread::current().id()
-    );
-    let test_path = temp_dir.path().join(unique_id);
-    std::fs::create_dir_all(&test_path).unwrap();
 
     // Set the environment variable for this test
-    std::env::set_var("XDG_DATA_HOME", &test_path);
+    std::env::set_var("XDG_DATA_HOME", temp_dir.path());
 
+    // Now create the manager - it will use the temp directory
     let manager = mcp_helper::config::ConfigManager::new().unwrap();
+
     (manager, temp_dir)
 }

@@ -391,7 +391,8 @@ mod tests {
     #[test]
     fn test_metadata_caching() {
         let temp_dir = TempDir::new().unwrap();
-        std::env::set_var("HOME", temp_dir.path());
+        // Set the appropriate cache directory environment variable
+        std::env::set_var("XDG_CACHE_HOME", temp_dir.path());
 
         let mut cache_manager = CacheManager::new().unwrap();
 
@@ -412,6 +413,9 @@ mod tests {
         let cached = cache_manager.get_server_metadata("test-server");
         assert!(cached.is_some());
         assert_eq!(cached.unwrap().metadata.name, "test-server");
+
+        // Clean up
+        std::env::remove_var("XDG_CACHE_HOME");
     }
 
     #[test]
