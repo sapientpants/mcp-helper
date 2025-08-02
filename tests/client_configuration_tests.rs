@@ -1,8 +1,8 @@
 //! Comprehensive tests for client configuration management
 
 use mcp_helper::client::{
-    detect_clients, ClaudeCodeClient, ClaudeDesktopClient, ClientRegistry, CursorClient,
-    McpClient, ServerConfig, VSCodeClient, WindsurfClient,
+    detect_clients, ClaudeCodeClient, ClaudeDesktopClient, ClientRegistry, CursorClient, McpClient,
+    ServerConfig, VSCodeClient, WindsurfClient,
 };
 use std::collections::HashMap;
 
@@ -14,7 +14,10 @@ fn create_test_server_config(name: &str) -> ServerConfig {
         args: vec![format!("{name}-arg1"), format!("{name}-arg2")],
         env: {
             let mut env = HashMap::new();
-            env.insert(format!("{}_KEY", name.to_uppercase()), format!("{name}-value"));
+            env.insert(
+                format!("{}_KEY", name.to_uppercase()),
+                format!("{name}-value"),
+            );
             env
         },
     }
@@ -27,7 +30,10 @@ fn test_all_client_types_have_unique_names() {
 
     for client in &clients {
         let name = client.name();
-        assert!(!names.contains(&name), "Duplicate client name found: {name}");
+        assert!(
+            !names.contains(&name),
+            "Duplicate client name found: {name}"
+        );
         names.push(name);
     }
 
@@ -45,21 +51,21 @@ fn test_all_client_types_have_valid_config_paths() {
 
     for client in &clients {
         let path = client.config_path();
-        
+
         // Path should not be empty
         let name = client.name();
         assert!(!path.as_os_str().is_empty(), "{name} has empty config path");
-        
+
         // Path should contain appropriate file extension
         let path_str = path.to_string_lossy();
         assert!(
-            path_str.ends_with(".json") || 
-            path_str.ends_with(".yaml") || 
-            path_str.ends_with(".yml") ||
-            path_str.ends_with(".toml") ||
-            path_str.contains("config"), // Some clients might use config directories
-            "{} has unexpected config path format: {}", 
-            client.name(), 
+            path_str.ends_with(".json")
+                || path_str.ends_with(".yaml")
+                || path_str.ends_with(".yml")
+                || path_str.ends_with(".toml")
+                || path_str.contains("config"), // Some clients might use config directories
+            "{} has unexpected config path format: {}",
+            client.name(),
             path_str
         );
     }
@@ -70,7 +76,9 @@ fn test_client_specific_paths() {
     // Test Claude Desktop
     let claude = ClaudeDesktopClient::new();
     let claude_path = claude.config_path();
-    assert!(claude_path.to_string_lossy().contains("claude_desktop_config.json"));
+    assert!(claude_path
+        .to_string_lossy()
+        .contains("claude_desktop_config.json"));
 
     // Test Claude Code
     let claude_code = ClaudeCodeClient::new();
@@ -80,14 +88,18 @@ fn test_client_specific_paths() {
     // Test Cursor
     let cursor = CursorClient::new();
     let cursor_path = cursor.config_path();
-    assert!(cursor_path.to_string_lossy().contains("Cursor") || 
-            cursor_path.to_string_lossy().contains("cursor"));
+    assert!(
+        cursor_path.to_string_lossy().contains("Cursor")
+            || cursor_path.to_string_lossy().contains("cursor")
+    );
 
     // Test VS Code
     let vscode = VSCodeClient::new();
     let vscode_path = vscode.config_path();
-    assert!(vscode_path.to_string_lossy().contains("Code") || 
-            vscode_path.to_string_lossy().contains("vscode"));
+    assert!(
+        vscode_path.to_string_lossy().contains("Code")
+            || vscode_path.to_string_lossy().contains("vscode")
+    );
 
     // Test Windsurf
     let windsurf = WindsurfClient::new();
@@ -99,7 +111,11 @@ fn test_client_specific_paths() {
 fn test_server_config_equality_and_cloning() {
     let config1 = ServerConfig {
         command: "node".to_string(),
-        args: vec!["server.js".to_string(), "--port".to_string(), "3000".to_string()],
+        args: vec![
+            "server.js".to_string(),
+            "--port".to_string(),
+            "3000".to_string(),
+        ],
         env: {
             let mut env = HashMap::new();
             env.insert("NODE_ENV".to_string(), "production".to_string());
@@ -124,7 +140,9 @@ fn test_server_config_equality_and_cloning() {
 
     // Test inequality with different env
     let mut config5 = config1.clone();
-    config5.env.insert("EXTRA_VAR".to_string(), "value".to_string());
+    config5
+        .env
+        .insert("EXTRA_VAR".to_string(), "value".to_string());
     assert_ne!(config1, config5);
 }
 
@@ -142,7 +160,10 @@ fn test_server_config_json_serialization() {
         ],
         env: {
             let mut env = HashMap::new();
-            env.insert("DOCKER_HOST".to_string(), "unix:///var/run/docker.sock".to_string());
+            env.insert(
+                "DOCKER_HOST".to_string(),
+                "unix:///var/run/docker.sock".to_string(),
+            );
             env.insert("COMPOSE_PROJECT_NAME".to_string(), "mcp-test".to_string());
             env
         },
@@ -150,12 +171,12 @@ fn test_server_config_json_serialization() {
 
     // Serialize to JSON
     let json = serde_json::to_string_pretty(&original).unwrap();
-    
+
     // Verify JSON structure
     assert!(json.contains("\"command\": \"docker\""));
     assert!(json.contains("\"run\""));
     assert!(json.contains("\"DOCKER_HOST\""));
-    
+
     // Deserialize back
     let deserialized: ServerConfig = serde_json::from_str(&json).unwrap();
     assert_eq!(original, deserialized);
@@ -197,13 +218,13 @@ fn test_server_config_edge_cases() {
     env.insert("SPACES".to_string(), "   ".to_string());
     env.insert("NEWLINE".to_string(), "line1\nline2".to_string());
     env.insert("UNICODE".to_string(), "Hello 世界 🌍".to_string());
-    
+
     let config = ServerConfig {
         command: "test".to_string(),
         args: vec![],
         env,
     };
-    
+
     assert_eq!(config.env["EMPTY"], "");
     assert_eq!(config.env["SPACES"], "   ");
     assert!(config.env["NEWLINE"].contains('\n'));
@@ -213,7 +234,7 @@ fn test_server_config_edge_cases() {
 #[test]
 fn test_client_registry_with_all_real_clients() {
     let mut registry = ClientRegistry::new();
-    
+
     // Register all real client types
     registry.register(Box::new(ClaudeCodeClient::new()));
     registry.register(Box::new(ClaudeDesktopClient::new()));
@@ -276,12 +297,12 @@ fn test_platform_specific_config_paths() {
         {
             // macOS paths should use appropriate directories
             assert!(
-                path_str.contains("Library") ||
-                path_str.contains("Application Support") ||
-                path_str.contains(".config") ||
-                path_str.starts_with("/Users") ||
-                path_str.starts_with("~") ||
-                path.is_relative(),
+                path_str.contains("Library")
+                    || path_str.contains("Application Support")
+                    || path_str.contains(".config")
+                    || path_str.starts_with("/Users")
+                    || path_str.starts_with("~")
+                    || path.is_relative(),
                 "{} doesn't use macOS-appropriate path: {}",
                 client.name(),
                 path_str
@@ -292,11 +313,11 @@ fn test_platform_specific_config_paths() {
         {
             // Linux paths should use appropriate directories
             assert!(
-                path_str.contains(".config") ||
-                path_str.contains(".local") ||
-                path_str.starts_with("/home") ||
-                path_str.starts_with("~") ||
-                path.is_relative(),
+                path_str.contains(".config")
+                    || path_str.contains(".local")
+                    || path_str.starts_with("/home")
+                    || path_str.starts_with("~")
+                    || path.is_relative(),
                 "{} doesn't use Linux-appropriate path: {}",
                 client.name(),
                 path_str
@@ -369,7 +390,7 @@ fn test_server_config_with_different_command_types() {
     assert_ne!(npm_config, python_config);
     assert_ne!(python_config, docker_config);
     assert_ne!(docker_config, binary_config);
-    
+
     // Verify serialization works for all types
     for config in &[npm_config, python_config, docker_config, binary_config] {
         let json = serde_json::to_string(config).unwrap();
@@ -393,7 +414,7 @@ fn test_registry_operations_with_mixed_installation_states() {
 
     // Get installed clients
     let installed = registry.detect_installed();
-    
+
     // At least verify the method works and returns valid clients
     for client in installed {
         assert!(client.is_installed());
@@ -402,7 +423,13 @@ fn test_registry_operations_with_mixed_installation_states() {
     }
 
     // Verify we can still look up clients by name regardless of installation status
-    let all_names = vec!["Claude Code", "Claude Desktop", "Cursor", "VS Code", "Windsurf"];
+    let all_names = vec![
+        "Claude Code",
+        "Claude Desktop",
+        "Cursor",
+        "VS Code",
+        "Windsurf",
+    ];
     for name in all_names {
         assert!(
             registry.get_by_name(name).is_some(),
@@ -416,21 +443,40 @@ fn test_environment_variable_validation() {
     // Test various environment variable scenarios
     let test_cases = vec![
         // Valid cases
-        (HashMap::from([("VALID_KEY".to_string(), "value".to_string())]), true),
-        (HashMap::from([("PATH".to_string(), "/usr/bin:/bin".to_string())]), true),
-        (HashMap::from([("_UNDERSCORE".to_string(), "ok".to_string())]), true),
-        (HashMap::from([("NUM123".to_string(), "456".to_string())]), true),
-        
+        (
+            HashMap::from([("VALID_KEY".to_string(), "value".to_string())]),
+            true,
+        ),
+        (
+            HashMap::from([("PATH".to_string(), "/usr/bin:/bin".to_string())]),
+            true,
+        ),
+        (
+            HashMap::from([("_UNDERSCORE".to_string(), "ok".to_string())]),
+            true,
+        ),
+        (
+            HashMap::from([("NUM123".to_string(), "456".to_string())]),
+            true,
+        ),
         // Edge cases that should be handled
-        (HashMap::from([("EMPTY_VALUE".to_string(), "".to_string())]), true),
-        (HashMap::from([("UNICODE_KEY_🔑".to_string(), "value".to_string())]), true),
-        
+        (
+            HashMap::from([("EMPTY_VALUE".to_string(), "".to_string())]),
+            true,
+        ),
+        (
+            HashMap::from([("UNICODE_KEY_🔑".to_string(), "value".to_string())]),
+            true,
+        ),
         // Multiple variables
-        (HashMap::from([
-            ("VAR1".to_string(), "value1".to_string()),
-            ("VAR2".to_string(), "value2".to_string()),
-            ("VAR3".to_string(), "value3".to_string()),
-        ]), true),
+        (
+            HashMap::from([
+                ("VAR1".to_string(), "value1".to_string()),
+                ("VAR2".to_string(), "value2".to_string()),
+                ("VAR3".to_string(), "value3".to_string()),
+            ]),
+            true,
+        ),
     ];
 
     for (env, should_be_valid) in test_cases {

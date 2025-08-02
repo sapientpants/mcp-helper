@@ -53,7 +53,7 @@ impl TestableClaudeDesktopClient {
         // we'll test the actual client behavior with the real paths
         // For comprehensive testing, we'd need to modify the actual implementation
         // to accept a config path parameter or use dependency injection
-        
+
         // For now, let's create a simple mock behavior
         let current_content = if self.config_path.exists() {
             fs::read_to_string(&self.config_path)?
@@ -85,7 +85,7 @@ impl TestableClaudeDesktopClient {
 
         let content = fs::read_to_string(&self.config_path)?;
         let json: serde_json::Value = serde_json::from_str(&content)?;
-        
+
         let mut servers = HashMap::new();
         if let Some(mcp_servers) = json.get("mcpServers").and_then(|v| v.as_object()) {
             for (name, value) in mcp_servers {
@@ -103,17 +103,19 @@ impl TestableClaudeDesktopClient {
 fn test_claude_desktop_client_creation() {
     let client = ClaudeDesktopClient::new();
     assert_eq!(client.name(), "Claude Desktop");
-    
+
     // Config path should be platform-specific
     let config_path = client.config_path();
-    assert!(config_path.to_string_lossy().contains("claude_desktop_config.json"));
+    assert!(config_path
+        .to_string_lossy()
+        .contains("claude_desktop_config.json"));
 }
 
 #[test]
 fn test_claude_desktop_client_default_trait() {
     let client1 = ClaudeDesktopClient::new();
     let client2 = ClaudeDesktopClient::default();
-    
+
     // Both should have the same configuration
     assert_eq!(client1.name(), client2.name());
     assert_eq!(client1.config_path(), client2.config_path());
@@ -123,7 +125,7 @@ fn test_claude_desktop_client_default_trait() {
 fn test_claude_desktop_client_platform_paths() {
     let client = ClaudeDesktopClient::new();
     let path = client.config_path();
-    
+
     #[cfg(target_os = "windows")]
     {
         // Should contain either APPDATA or config directory
@@ -133,20 +135,20 @@ fn test_claude_desktop_client_platform_paths() {
             "Windows path should contain Claude directory and config file"
         );
     }
-    
+
     #[cfg(target_os = "macos")]
     {
         // Should be in Library/Application Support
         let path_str = path.to_string_lossy();
         assert!(
-            path_str.contains("Library") && 
-            path_str.contains("Application Support") && 
-            path_str.contains("Claude") &&
-            path_str.contains("claude_desktop_config.json"),
+            path_str.contains("Library")
+                && path_str.contains("Application Support")
+                && path_str.contains("Claude")
+                && path_str.contains("claude_desktop_config.json"),
             "macOS path should be in Application Support"
         );
     }
-    
+
     #[cfg(target_os = "linux")]
     {
         // Should be in config directory
@@ -180,7 +182,7 @@ fn test_server_config_validation() {
     let _result = client.add_server("test", config);
     // In real implementation, this should fail validation
     // For now, we're testing the mock behavior
-    
+
     // Test valid config
     let config = ServerConfig {
         command: "node".to_string(),
@@ -217,9 +219,10 @@ fn test_add_and_list_servers_empty_config() {
 #[test]
 fn test_add_server_to_existing_config() {
     let env = TestEnvironment::new();
-    
+
     // Create initial config with one server
-    env.create_config_file(r#"{
+    env.create_config_file(
+        r#"{
         "mcpServers": {
             "existing": {
                 "command": "python",
@@ -230,7 +233,8 @@ fn test_add_server_to_existing_config() {
         "otherSettings": {
             "theme": "dark"
         }
-    }"#);
+    }"#,
+    );
 
     let client = env.create_claude_client();
 
@@ -314,44 +318,56 @@ fn test_complex_server_configurations() {
 
     // Add multiple complex servers
     let servers_to_add = vec![
-        ("filesystem", ServerConfig {
-            command: "npx".to_string(),
-            args: vec![
-                "-y".to_string(),
-                "@modelcontextprotocol/server-filesystem".to_string(),
-                "/Users/testuser/Documents".to_string(),
-            ],
-            env: HashMap::new(),
-        }),
-        ("github", ServerConfig {
-            command: "npx".to_string(),
-            args: vec![
-                "-y".to_string(),
-                "@modelcontextprotocol/server-github".to_string(),
-            ],
-            env: {
-                let mut env = HashMap::new();
-                env.insert("GITHUB_TOKEN".to_string(), "ghp_testtoken123".to_string());
-                env
+        (
+            "filesystem",
+            ServerConfig {
+                command: "npx".to_string(),
+                args: vec![
+                    "-y".to_string(),
+                    "@modelcontextprotocol/server-filesystem".to_string(),
+                    "/Users/testuser/Documents".to_string(),
+                ],
+                env: HashMap::new(),
             },
-        }),
-        ("docker-server", ServerConfig {
-            command: "docker".to_string(),
-            args: vec![
-                "run".to_string(),
-                "--rm".to_string(),
-                "-p".to_string(),
-                "8080:8080".to_string(),
-                "-e".to_string(),
-                "CONFIG=/app/config.json".to_string(),
-                "mcp-server:latest".to_string(),
-            ],
-            env: {
-                let mut env = HashMap::new();
-                env.insert("DOCKER_HOST".to_string(), "unix:///var/run/docker.sock".to_string());
-                env
+        ),
+        (
+            "github",
+            ServerConfig {
+                command: "npx".to_string(),
+                args: vec![
+                    "-y".to_string(),
+                    "@modelcontextprotocol/server-github".to_string(),
+                ],
+                env: {
+                    let mut env = HashMap::new();
+                    env.insert("GITHUB_TOKEN".to_string(), "ghp_testtoken123".to_string());
+                    env
+                },
             },
-        }),
+        ),
+        (
+            "docker-server",
+            ServerConfig {
+                command: "docker".to_string(),
+                args: vec![
+                    "run".to_string(),
+                    "--rm".to_string(),
+                    "-p".to_string(),
+                    "8080:8080".to_string(),
+                    "-e".to_string(),
+                    "CONFIG=/app/config.json".to_string(),
+                    "mcp-server:latest".to_string(),
+                ],
+                env: {
+                    let mut env = HashMap::new();
+                    env.insert(
+                        "DOCKER_HOST".to_string(),
+                        "unix:///var/run/docker.sock".to_string(),
+                    );
+                    env
+                },
+            },
+        ),
     ];
 
     for (name, config) in &servers_to_add {
@@ -371,18 +387,20 @@ fn test_complex_server_configurations() {
 #[test]
 fn test_malformed_config_handling() {
     let env = TestEnvironment::new();
-    
+
     // Create malformed JSON
-    env.create_config_file(r#"{
+    env.create_config_file(
+        r#"{
         "mcpServers": {
             "broken": {
                 "command": "test",
                 "args": ["missing closing bracket"
         }
-    }"#);
+    }"#,
+    );
 
     let client = env.create_claude_client();
-    
+
     // Should handle malformed JSON gracefully
     let _result = client.list_servers();
     // In a real implementation, this might return an error or empty list
@@ -396,7 +414,10 @@ fn test_config_with_unicode_and_special_chars() {
 
     let mut env_vars = HashMap::new();
     env_vars.insert("MESSAGE".to_string(), "Hello 世界! 🌍".to_string());
-    env_vars.insert("PATH_WITH_SPACES".to_string(), "C:\\Program Files\\Test App".to_string());
+    env_vars.insert(
+        "PATH_WITH_SPACES".to_string(),
+        "C:\\Program Files\\Test App".to_string(),
+    );
 
     let config = ServerConfig {
         command: "python3".to_string(),
@@ -413,7 +434,7 @@ fn test_config_with_unicode_and_special_chars() {
     // Verify unicode is preserved
     let servers = client.list_servers().unwrap();
     assert_eq!(servers["unicode-test"], config);
-    
+
     // Verify JSON encoding
     let content = env.read_config_file();
     assert!(content.contains("Hello 世界! 🌍"));
@@ -446,7 +467,7 @@ fn test_concurrent_server_additions() {
     let env = TestEnvironment::new();
     // Add initial empty config to avoid EOF errors
     env.create_config_file("{}");
-    
+
     let client = Arc::new(Mutex::new(env.create_claude_client()));
 
     // Note: In a real implementation, we'd need proper synchronization
@@ -463,7 +484,9 @@ fn test_concurrent_server_additions() {
                 };
                 // Serialize access to prevent concurrent writes
                 let client = client.lock().unwrap();
-                client.add_server(&format!("concurrent-{i}"), config).unwrap();
+                client
+                    .add_server(&format!("concurrent-{i}"), config)
+                    .unwrap();
             })
         })
         .collect();
@@ -502,19 +525,19 @@ fn test_server_name_edge_cases() {
         "123numeric",
         "special!@#chars",
         "very-long-server-name-that-might-cause-issues-in-some-systems",
-        "名前", // Japanese
+        "名前",      // Japanese
         "🚀-rocket", // Emoji
     ];
 
     let num_names = test_names.len();
-    
+
     for name in &test_names {
         client.add_server(name, config.clone()).unwrap();
     }
 
     let servers = client.list_servers().unwrap();
     assert_eq!(servers.len(), num_names);
-    
+
     for name in &test_names {
         assert!(servers.contains_key(*name), "Server '{name}' should exist");
     }

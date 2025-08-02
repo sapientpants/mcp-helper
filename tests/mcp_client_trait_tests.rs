@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use mcp_helper::client::{
-    get_home_with_fallback, detect_clients, ClientRegistry, HomeDirectoryProvider, McpClient,
+    detect_clients, get_home_with_fallback, ClientRegistry, HomeDirectoryProvider, McpClient,
     RealHomeDirectoryProvider, ServerConfig,
 };
 use std::collections::HashMap;
@@ -96,7 +96,10 @@ fn test_mcp_client_trait_basic_implementation() {
     let client = TestMcpClient::new("TestClient");
 
     assert_eq!(client.name(), "TestClient");
-    assert_eq!(client.config_path(), PathBuf::from("/test/TestClient/config.json"));
+    assert_eq!(
+        client.config_path(),
+        PathBuf::from("/test/TestClient/config.json")
+    );
     assert!(client.is_installed());
 }
 
@@ -132,16 +135,22 @@ fn test_mcp_client_error_handling() {
         args: vec![],
         env: HashMap::new(),
     };
-    
+
     let result = client.add_server("test", config);
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Mock add_server failure"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Mock add_server failure"));
 
     // Test list_servers failure
     let client = TestMcpClient::new("ErrorClient").with_list_servers_failure();
     let result = client.list_servers();
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Mock list_servers failure"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Mock list_servers failure"));
 }
 
 #[test]
@@ -181,7 +190,11 @@ fn test_server_config_serialization() {
 
     let config = ServerConfig {
         command: "docker".to_string(),
-        args: vec!["run".to_string(), "-it".to_string(), "mcp-server".to_string()],
+        args: vec![
+            "run".to_string(),
+            "-it".to_string(),
+            "mcp-server".to_string(),
+        ],
         env,
     };
 
@@ -207,7 +220,9 @@ fn test_client_registry_operations() {
 
     // Add multiple clients
     registry.register(Box::new(TestMcpClient::new("Client1").with_installed(true)));
-    registry.register(Box::new(TestMcpClient::new("Client2").with_installed(false)));
+    registry.register(Box::new(
+        TestMcpClient::new("Client2").with_installed(false),
+    ));
     registry.register(Box::new(TestMcpClient::new("Client3").with_installed(true)));
 
     assert_eq!(registry.clients.len(), 3);
@@ -244,13 +259,13 @@ fn test_home_directory_provider_trait() {
     struct TestHomeProvider {
         home_path: PathBuf,
     }
-    
+
     impl HomeDirectoryProvider for TestHomeProvider {
         fn home_dir(&self) -> Option<PathBuf> {
             Some(self.home_path.clone())
         }
     }
-    
+
     // Test mock provider
     let mock_home = PathBuf::from("/mock/home");
     let mock_provider = TestHomeProvider {
@@ -269,13 +284,13 @@ fn test_get_home_with_fallback() {
     struct TestHomeProvider {
         home_path: Option<PathBuf>,
     }
-    
+
     impl HomeDirectoryProvider for TestHomeProvider {
         fn home_dir(&self) -> Option<PathBuf> {
             self.home_path.clone()
         }
     }
-    
+
     // Test with provider that returns a home directory
     let mock_home = PathBuf::from("/test/home");
     let provider = TestHomeProvider {
@@ -300,10 +315,10 @@ fn test_get_home_with_fallback() {
 #[test]
 fn test_detect_clients_returns_all_client_types() {
     let clients = detect_clients();
-    
+
     // Should return exactly 5 clients
     assert_eq!(clients.len(), 5);
-    
+
     // Verify all expected clients are present
     let client_names: Vec<&str> = clients.iter().map(|c| c.name()).collect();
     assert!(client_names.contains(&"Claude Code"));
@@ -311,7 +326,7 @@ fn test_detect_clients_returns_all_client_types() {
     assert!(client_names.contains(&"Cursor"));
     assert!(client_names.contains(&"VS Code"));
     assert!(client_names.contains(&"Windsurf"));
-    
+
     // Verify each client has a unique name
     let mut unique_names = client_names.clone();
     unique_names.sort();
@@ -324,18 +339,18 @@ fn test_mcp_client_trait_send_sync() {
     // Verify that McpClient trait objects can be sent between threads
     fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<Box<dyn McpClient>>();
-    
+
     // Test actual usage across threads
     let client: Box<dyn McpClient> = Box::new(TestMcpClient::new("ThreadSafeClient"));
     let client = Arc::new(client);
-    
+
     let handles: Vec<_> = (0..3)
         .map(|i| {
             let client = Arc::clone(&client);
             std::thread::spawn(move || {
                 assert_eq!(client.name(), "ThreadSafeClient");
                 assert!(client.is_installed());
-                
+
                 let config = ServerConfig {
                     command: format!("cmd{i}"),
                     args: vec![],
@@ -345,7 +360,7 @@ fn test_mcp_client_trait_send_sync() {
             })
         })
         .collect();
-    
+
     for handle in handles {
         handle.join().unwrap();
     }
@@ -371,7 +386,10 @@ fn test_server_config_with_complex_environment() {
     };
 
     assert_eq!(config.env.len(), 4);
-    assert_eq!(config.env.get("PATH"), Some(&"/usr/local/bin:/usr/bin".to_string()));
+    assert_eq!(
+        config.env.get("PATH"),
+        Some(&"/usr/local/bin:/usr/bin".to_string())
+    );
     assert_eq!(config.env.get("NODE_ENV"), Some(&"production".to_string()));
     assert_eq!(config.env.get("EMPTY_VAR"), Some(&String::new()));
 }
@@ -382,25 +400,34 @@ fn test_client_with_multiple_servers() {
 
     // Add multiple servers
     let configs = vec![
-        ("filesystem", ServerConfig {
-            command: "npx".to_string(),
-            args: vec!["@modelcontextprotocol/server-filesystem".to_string()],
-            env: HashMap::new(),
-        }),
-        ("github", ServerConfig {
-            command: "npx".to_string(),
-            args: vec!["@modelcontextprotocol/server-github".to_string()],
-            env: {
-                let mut env = HashMap::new();
-                env.insert("GITHUB_TOKEN".to_string(), "ghp_xxx".to_string());
-                env
+        (
+            "filesystem",
+            ServerConfig {
+                command: "npx".to_string(),
+                args: vec!["@modelcontextprotocol/server-filesystem".to_string()],
+                env: HashMap::new(),
             },
-        }),
-        ("python-server", ServerConfig {
-            command: "python".to_string(),
-            args: vec!["-m".to_string(), "mcp_server".to_string()],
-            env: HashMap::new(),
-        }),
+        ),
+        (
+            "github",
+            ServerConfig {
+                command: "npx".to_string(),
+                args: vec!["@modelcontextprotocol/server-github".to_string()],
+                env: {
+                    let mut env = HashMap::new();
+                    env.insert("GITHUB_TOKEN".to_string(), "ghp_xxx".to_string());
+                    env
+                },
+            },
+        ),
+        (
+            "python-server",
+            ServerConfig {
+                command: "python".to_string(),
+                args: vec!["-m".to_string(), "mcp_server".to_string()],
+                env: HashMap::new(),
+            },
+        ),
     ];
 
     for (name, config) in &configs {
@@ -410,7 +437,7 @@ fn test_client_with_multiple_servers() {
     // Verify all servers are present
     let servers = client.list_servers().unwrap();
     assert_eq!(servers.len(), 3);
-    
+
     for (name, config) in configs {
         assert!(servers.contains_key(name));
         assert_eq!(&servers[name], &config);
@@ -423,55 +450,59 @@ fn test_registry_with_mixed_client_states() {
 
     // Create clients with various states
     let mut initial_servers = HashMap::new();
-    initial_servers.insert("existing".to_string(), ServerConfig {
-        command: "test".to_string(),
-        args: vec![],
-        env: HashMap::new(),
-    });
+    initial_servers.insert(
+        "existing".to_string(),
+        ServerConfig {
+            command: "test".to_string(),
+            args: vec![],
+            env: HashMap::new(),
+        },
+    );
 
     registry.register(Box::new(
         TestMcpClient::new("InstalledWithServers")
             .with_installed(true)
-            .with_initial_servers(initial_servers)
+            .with_initial_servers(initial_servers),
     ));
-    
+
     registry.register(Box::new(
-        TestMcpClient::new("InstalledEmpty")
-            .with_installed(true)
+        TestMcpClient::new("InstalledEmpty").with_installed(true),
     ));
-    
+
     registry.register(Box::new(
-        TestMcpClient::new("NotInstalled")
-            .with_installed(false)
+        TestMcpClient::new("NotInstalled").with_installed(false),
     ));
-    
+
     registry.register(Box::new(
         TestMcpClient::new("CustomPath")
             .with_installed(true)
-            .with_config_path(PathBuf::from("/custom/path/config.json"))
+            .with_config_path(PathBuf::from("/custom/path/config.json")),
     ));
 
     // Test various queries
     assert_eq!(registry.clients.len(), 4);
-    
+
     let installed = registry.detect_installed();
     assert_eq!(installed.len(), 3);
-    
+
     // Test specific client properties
     let client_with_servers = registry.get_by_name("InstalledWithServers").unwrap();
     let servers = client_with_servers.list_servers().unwrap();
     assert_eq!(servers.len(), 1);
     assert!(servers.contains_key("existing"));
-    
+
     let custom_path_client = registry.get_by_name("CustomPath").unwrap();
-    assert_eq!(custom_path_client.config_path(), PathBuf::from("/custom/path/config.json"));
+    assert_eq!(
+        custom_path_client.config_path(),
+        PathBuf::from("/custom/path/config.json")
+    );
 }
 
 #[test]
 #[cfg(windows)]
 fn test_get_home_with_fallback_windows() {
     use std::env;
-    
+
     struct NoneHomeProvider;
     impl HomeDirectoryProvider for NoneHomeProvider {
         fn home_dir(&self) -> Option<PathBuf> {
@@ -485,14 +516,20 @@ fn test_get_home_with_fallback_windows() {
     // Test USERPROFILE fallback
     env::set_var("USERPROFILE", "C:\\Users\\TestUser");
     env::remove_var("HOME");
-    
+
     let provider = NoneHomeProvider;
-    assert_eq!(get_home_with_fallback(&provider), PathBuf::from("C:\\Users\\TestUser"));
+    assert_eq!(
+        get_home_with_fallback(&provider),
+        PathBuf::from("C:\\Users\\TestUser")
+    );
 
     // Test HOME fallback when USERPROFILE is not set
     env::remove_var("USERPROFILE");
     env::set_var("HOME", "C:\\Home\\TestUser");
-    assert_eq!(get_home_with_fallback(&provider), PathBuf::from("C:\\Home\\TestUser"));
+    assert_eq!(
+        get_home_with_fallback(&provider),
+        PathBuf::from("C:\\Home\\TestUser")
+    );
 
     // Test ultimate fallback
     env::remove_var("USERPROFILE");
@@ -512,7 +549,7 @@ fn test_get_home_with_fallback_windows() {
 #[cfg(not(windows))]
 fn test_get_home_with_fallback_unix() {
     use std::env;
-    
+
     struct NoneHomeProvider;
     impl HomeDirectoryProvider for NoneHomeProvider {
         fn home_dir(&self) -> Option<PathBuf> {
@@ -525,7 +562,10 @@ fn test_get_home_with_fallback_unix() {
     // Test HOME fallback
     env::set_var("HOME", "/home/testuser");
     let provider = NoneHomeProvider;
-    assert_eq!(get_home_with_fallback(&provider), PathBuf::from("/home/testuser"));
+    assert_eq!(
+        get_home_with_fallback(&provider),
+        PathBuf::from("/home/testuser")
+    );
 
     // Test ultimate fallback
     env::remove_var("HOME");
