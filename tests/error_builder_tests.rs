@@ -14,9 +14,10 @@ fn test_missing_dependency_builder_basic() {
         } => {
             assert_eq!(dependency, "Node.js");
             assert_eq!(required_version, None);
-            assert_eq!(install_instructions.windows.len(), 0);
-            assert_eq!(install_instructions.macos.len(), 0);
-            assert_eq!(install_instructions.linux.len(), 0);
+            // Default builder uses empty install instructions
+            assert!(install_instructions.windows.is_empty());
+            assert!(install_instructions.macos.is_empty());
+            assert!(install_instructions.linux.is_empty());
         }
         _ => panic!("Expected MissingDependency error"),
     }
@@ -318,4 +319,149 @@ fn test_error_builder_chaining() {
     assert!(matches!(error1, McpError::MissingDependency { .. }));
     assert!(matches!(error2, McpError::VersionMismatch { .. }));
     assert!(matches!(error3, McpError::ConfigurationRequired { .. }));
+}
+
+#[test]
+fn test_builder_with_string_types() {
+    // Test that builders accept different string types
+    let error1 = ErrorBuilder::missing_dependency("Test1").build();
+    let error2 = ErrorBuilder::missing_dependency(&String::from("Test2")).build();
+    let error3 = ErrorBuilder::missing_dependency(&String::from("Test3")).build();
+
+    match (error1, error2, error3) {
+        (
+            McpError::MissingDependency {
+                dependency: dep1, ..
+            },
+            McpError::MissingDependency {
+                dependency: dep2, ..
+            },
+            McpError::MissingDependency {
+                dependency: dep3, ..
+            },
+        ) => {
+            assert_eq!(dep1, "Test1");
+            assert_eq!(dep2, "Test2");
+            assert_eq!(dep3, "Test3");
+        }
+        _ => panic!("Expected MissingDependency variants"),
+    }
+}
+
+#[test]
+fn test_config_required_fields_with_owned_strings() {
+    let fields: Vec<(String, String)> = vec![
+        ("field1".to_string(), "Description 1".to_string()),
+        ("field2".to_string(), "Description 2".to_string()),
+    ];
+
+    let error = ErrorBuilder::config_required("test").fields(fields).build();
+
+    match error {
+        McpError::ConfigurationRequired { missing_fields, .. } => {
+            assert_eq!(missing_fields.len(), 2);
+            assert_eq!(missing_fields[0], "field1");
+            assert_eq!(missing_fields[1], "field2");
+        }
+        _ => panic!("Expected ConfigurationRequired variant"),
+    }
+}
+
+#[test]
+fn test_version_mismatch_builder_chaining() {
+    // Test that methods can be chained in any order
+    let error1 = ErrorBuilder::version_mismatch("Test")
+        .required("2.0")
+        .installed("1.0")
+        .build();
+
+    let error2 = ErrorBuilder::version_mismatch("Test")
+        .installed("1.0")
+        .required("2.0")
+        .build();
+
+    match (error1, error2) {
+        (
+            McpError::VersionMismatch {
+                current_version: v1_current,
+                required_version: v1_required,
+                ..
+            },
+            McpError::VersionMismatch {
+                current_version: v2_current,
+                required_version: v2_required,
+                ..
+            },
+        ) => {
+            assert_eq!(v1_current, v2_current);
+            assert_eq!(v1_required, v2_required);
+        }
+        _ => panic!("Expected VersionMismatch variants"),
+    }
+}
+
+#[test]
+fn test_version_mismatch_empty_versions() {
+    // Test that empty strings can be set for versions
+    let error = ErrorBuilder::version_mismatch("Test")
+        .installed("")
+        .required("")
+        .build();
+
+    match error {
+        McpError::VersionMismatch {
+            current_version,
+            required_version,
+            ..
+        } => {
+            assert_eq!(current_version, "");
+            assert_eq!(required_version, "");
+        }
+        _ => panic!("Expected VersionMismatch variant"),
+    }
+}
+
+#[test]
+fn test_complex_config_scenario() {
+    // Test a realistic configuration scenario
+    let error = ErrorBuilder::config_required("oauth-server")
+        .field("client_id", "OAuth2 client identifier")
+        .field("client_secret", "OAuth2 client secret")
+        .fields(vec![
+            ("redirect_uri", "OAuth2 redirect URI"),
+            ("scope", "OAuth2 permission scope"),
+        ])
+        .field("auth_endpoint", "Authorization endpoint URL")
+        .build();
+
+    match error {
+        McpError::ConfigurationRequired {
+            server_name,
+            missing_fields,
+            field_descriptions,
+        } => {
+            assert_eq!(server_name, "oauth-server");
+            assert_eq!(missing_fields.len(), 5);
+
+            // Verify order is preserved
+            let expected_fields = [
+                "client_id",
+                "client_secret",
+                "redirect_uri",
+                "scope",
+                "auth_endpoint",
+            ];
+            for (i, expected) in expected_fields.iter().enumerate() {
+                assert_eq!(&missing_fields[i], expected);
+            }
+
+            // Verify all descriptions are present
+            assert_eq!(field_descriptions.len(), 5);
+            for (field, desc) in &field_descriptions {
+                assert!(!field.is_empty());
+                assert!(!desc.is_empty());
+            }
+        }
+        _ => panic!("Expected ConfigurationRequired variant"),
+    }
 }
