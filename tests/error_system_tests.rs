@@ -555,4 +555,10 @@ fn test_complex_install_instructions() {
         assert!(stripped.contains("macports"));
         assert!(stripped.contains("MacPorts alternative"));
     }
+    #[cfg(target_os = "linux")]
+    {
+        // On Linux, we should see package manager instructions
+        assert!(!stripped.is_empty());
+        assert!(stripped.contains("Node.js"));
+    }
 }
