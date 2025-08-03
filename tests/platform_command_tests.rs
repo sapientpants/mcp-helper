@@ -29,11 +29,21 @@ fn test_windows_npx_command_handling() {
         )
         .unwrap();
 
-    // On Windows, it returns npx without cmd.exe wrapper in tests (no which available)
-    assert_eq!(cmd, "npx");
-    assert_eq!(args[0], "@modelcontextprotocol/server-filesystem");
-    assert_eq!(args[1], "--path");
-    assert_eq!(args[2], "C:\\Users\\test");
+    // On Windows, it can return either cmd.exe (when npx.cmd is found) or npx
+    if cmd == "cmd.exe" {
+        // When npx.cmd is found, args are ["/c", "npx.cmd", server, ...]
+        assert_eq!(args[0], "/c");
+        assert_eq!(args[1], "npx.cmd");
+        assert_eq!(args[2], "@modelcontextprotocol/server-filesystem");
+        assert_eq!(args[3], "--path");
+        assert_eq!(args[4], "C:\\Users\\test");
+    } else {
+        // When npx.cmd is not found but npx is
+        assert_eq!(cmd, "npx");
+        assert_eq!(args[0], "@modelcontextprotocol/server-filesystem");
+        assert_eq!(args[1], "--path");
+        assert_eq!(args[2], "C:\\Users\\test");
+    }
 }
 
 #[test]
@@ -70,27 +80,48 @@ fn test_windows_executable_detection() {
         .unwrap();
 
     // Non-existing paths are treated as npm packages
-    assert_eq!(cmd, "npx");
-    assert_eq!(
-        args,
-        vec!["C:\\Program Files\\App\\server.exe", "--port", "3000"]
-    );
+    if cmd == "cmd.exe" {
+        assert_eq!(args[0], "/c");
+        assert_eq!(args[1], "npx.cmd");
+        assert_eq!(args[2], "C:\\Program Files\\App\\server.exe");
+        assert_eq!(args[3], "--port");
+        assert_eq!(args[4], "3000");
+    } else {
+        assert_eq!(cmd, "npx");
+        assert_eq!(
+            args,
+            vec!["C:\\Program Files\\App\\server.exe", "--port", "3000"]
+        );
+    }
 
     // Test .cmd file
     let (cmd, args) = runner
         .get_command_for_platform(&PathBuf::from("script.cmd"), &[])
         .unwrap();
 
-    assert_eq!(cmd, "npx");
-    assert_eq!(args, vec!["script.cmd"]);
+    if cmd == "cmd.exe" {
+        assert_eq!(args[0], "/c");
+        assert_eq!(args[1], "npx.cmd");
+        assert_eq!(args[2], "script.cmd");
+    } else {
+        assert_eq!(cmd, "npx");
+        assert_eq!(args, vec!["script.cmd"]);
+    }
 
     // Test .bat file
     let (cmd, args) = runner
         .get_command_for_platform(&PathBuf::from("batch.bat"), &["arg1".to_string()])
         .unwrap();
 
-    assert_eq!(cmd, "npx");
-    assert_eq!(args, vec!["batch.bat", "arg1"]);
+    if cmd == "cmd.exe" {
+        assert_eq!(args[0], "/c");
+        assert_eq!(args[1], "npx.cmd");
+        assert_eq!(args[2], "batch.bat");
+        assert_eq!(args[3], "arg1");
+    } else {
+        assert_eq!(cmd, "npx");
+        assert_eq!(args, vec!["batch.bat", "arg1"]);
+    }
 }
 
 #[test]
@@ -147,15 +178,23 @@ fn test_command_with_special_characters() {
         )
         .unwrap();
 
-    assert_eq!(cmd, "npx");
-    assert_eq!(
-        args,
-        vec![
-            "Program Files\\My Server\\server.exe",
-            "--config",
-            "My Config.json"
-        ]
-    );
+    if cmd == "cmd.exe" {
+        assert_eq!(args[0], "/c");
+        assert_eq!(args[1], "npx.cmd");
+        assert_eq!(args[2], "Program Files\\My Server\\server.exe");
+        assert_eq!(args[3], "--config");
+        assert_eq!(args[4], "My Config.json");
+    } else {
+        assert_eq!(cmd, "npx");
+        assert_eq!(
+            args,
+            vec![
+                "Program Files\\My Server\\server.exe",
+                "--config",
+                "My Config.json"
+            ]
+        );
+    }
 
     // Unix: paths with special characters
     let unix_runner = ServerRunner::new(Platform::Linux, false);
@@ -179,9 +218,15 @@ fn test_scoped_npm_packages() {
             .get_command_for_platform(&PathBuf::from("@anthropic/mcp-server"), &[])
             .unwrap();
 
-        // All platforms use "npx" in tests (which::which not available)
-        assert_eq!(cmd, "npx");
-        assert_eq!(args[0], "@anthropic/mcp-server");
+        // Windows might use cmd.exe wrapper, Unix uses npx directly
+        if *platform == Platform::Windows && cmd == "cmd.exe" {
+            assert_eq!(args[0], "/c");
+            assert_eq!(args[1], "npx.cmd");
+            assert_eq!(args[2], "@anthropic/mcp-server");
+        } else {
+            assert_eq!(cmd, "npx");
+            assert_eq!(args[0], "@anthropic/mcp-server");
+        }
     }
 }
 
@@ -209,8 +254,16 @@ fn test_python_script_execution() {
             .unwrap();
 
         // Non-absolute paths are treated as npm packages
-        assert_eq!(cmd, "npx");
-        assert_eq!(args, vec!["server.py", "--port", "8080"]);
+        if *platform == Platform::Windows && cmd == "cmd.exe" {
+            assert_eq!(args[0], "/c");
+            assert_eq!(args[1], "npx.cmd");
+            assert_eq!(args[2], "server.py");
+            assert_eq!(args[3], "--port");
+            assert_eq!(args[4], "8080");
+        } else {
+            assert_eq!(cmd, "npx");
+            assert_eq!(args, vec!["server.py", "--port", "8080"]);
+        }
     }
 }
 
