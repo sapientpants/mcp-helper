@@ -10,11 +10,27 @@ fn test_server_runner_platform_creation() {
     let macos_runner = ServerRunner::new(Platform::MacOS, true);
     let linux_runner = ServerRunner::new(Platform::Linux, false);
 
-    // Can't access verbose field directly as it's private
-    // But we can test that runners are created successfully
-    let _ = windows_runner;
-    let _ = macos_runner;
-    let _ = linux_runner;
+    // Test that different platforms produce different command behavior
+    let test_server = "test-server";
+    let args = vec!["--verbose".to_string()];
+
+    // Windows should try to use npx.cmd or npx
+    let (win_cmd, _) = windows_runner
+        .get_command_for_platform(&PathBuf::from(test_server), &args)
+        .unwrap();
+    assert!(win_cmd == "cmd.exe" || win_cmd == "npx");
+
+    // macOS should use npx directly
+    let (mac_cmd, _) = macos_runner
+        .get_command_for_platform(&PathBuf::from(test_server), &args)
+        .unwrap();
+    assert_eq!(mac_cmd, "npx");
+
+    // Linux should use npx directly
+    let (linux_cmd, _) = linux_runner
+        .get_command_for_platform(&PathBuf::from(test_server), &args)
+        .unwrap();
+    assert_eq!(linux_cmd, "npx");
 }
 
 #[test]
@@ -273,9 +289,21 @@ fn test_verbose_mode_behavior() {
     let verbose_runner = ServerRunner::new(Platform::Windows, true);
     let quiet_runner = ServerRunner::new(Platform::Linux, false);
 
-    // Can't access verbose field, but we can test the runners work
-    let _ = verbose_runner;
-    let _ = quiet_runner;
+    // Test that verbose mode doesn't affect command construction
+    let test_args = vec!["--test".to_string()];
+
+    let (verbose_cmd, verbose_args) = verbose_runner
+        .get_command_for_platform(&PathBuf::from("test-server"), &test_args)
+        .unwrap();
+
+    let (quiet_cmd, quiet_args) = quiet_runner
+        .get_command_for_platform(&PathBuf::from("test-server"), &test_args)
+        .unwrap();
+
+    // Commands should be identical regardless of verbose mode
+    assert_eq!(verbose_cmd, "npx");
+    assert_eq!(quiet_cmd, "npx");
+    assert_eq!(verbose_args, quiet_args);
 }
 
 #[test]

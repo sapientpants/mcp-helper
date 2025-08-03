@@ -307,11 +307,11 @@ fn test_pathbuf_compatibility() {
     #[cfg(not(target_os = "windows"))]
     assert_eq!(path_unix.to_string_lossy(), "path/to/file");
 
-    // Prevent unused warnings on other platforms
-    #[cfg(not(target_os = "windows"))]
-    let _ = path_windows;
-    #[cfg(target_os = "windows")]
-    let _ = path_unix;
+    // Verify paths are valid PathBuf regardless of platform
+    assert!(!normalized_windows.is_empty());
+    assert!(!normalized_unix.is_empty());
+    assert_eq!(path_windows.components().count(), 3);
+    assert_eq!(path_unix.components().count(), 3);
 }
 
 #[test]
@@ -320,8 +320,12 @@ fn test_normalize_path_performance_characteristics() {
     let long_path = "a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z".repeat(10);
 
     let start = std::time::Instant::now();
-    let _ = normalize_path(&long_path, Platform::Windows);
+    let normalized = normalize_path(&long_path, Platform::Windows);
     let duration = start.elapsed();
+
+    // Verify the path was actually normalized
+    assert!(normalized.contains('\\'));
+    assert!(!normalized.contains('/'));
 
     // Should complete quickly even for very long paths
     assert!(

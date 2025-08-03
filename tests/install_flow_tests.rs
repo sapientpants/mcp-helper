@@ -330,8 +330,14 @@ fn test_verbose_execution_paths() {
     ];
 
     for input in test_cases {
-        let _ = cmd_verbose.execute(input);
-        // Just ensure it doesn't panic in verbose mode
+        let result = cmd_verbose.execute(input);
+        // Verbose mode should still validate input
+        if input.trim().is_empty() {
+            assert!(result.is_err(), "Empty input should fail");
+        } else {
+            // Non-empty inputs should at least parse (may fail later)
+            assert!(result.is_err()); // All will fail due to no clients
+        }
     }
 }
 
@@ -342,6 +348,26 @@ fn test_install_command_edge_cases() {
     let mut cmd2 = InstallCommand::new(false);
 
     // Both should work independently
-    let _ = cmd1.execute("test1");
-    let _ = cmd2.execute("test2");
+    let result1 = cmd1.execute("test1");
+    let result2 = cmd2.execute("test2");
+
+    // Both should fail in the same way (no clients detected)
+    assert!(result1.is_err());
+    assert!(result2.is_err());
+
+    // Verify they produce similar errors
+    match (result1, result2) {
+        (Err(e1), Err(e2)) => {
+            // Both should fail due to no clients
+            assert!(
+                e1.to_string().contains("No MCP clients detected")
+                    || e1.to_string().contains("clients")
+            );
+            assert!(
+                e2.to_string().contains("No MCP clients detected")
+                    || e2.to_string().contains("clients")
+            );
+        }
+        _ => panic!("Both commands should fail"),
+    }
 }

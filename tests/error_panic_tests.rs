@@ -292,18 +292,27 @@ fn test_error_builder_pattern() {
 fn test_no_panic_on_edge_cases() {
     // Test with null bytes (should not panic)
     let error = McpError::config_error("config\0.json", "message\0with\0nulls");
-    let _ = format!("{error}"); // Should not panic
+    let display = format!("{error}"); // Should not panic
+    assert!(!display.is_empty());
+    // Null bytes might be escaped or removed, but shouldn't panic
+    assert!(display.contains("config") || display.contains("json"));
 
     // Test with very nested error
     let mut nested_error = McpError::Other(anyhow::anyhow!("Level 0"));
     for i in 1..100 {
         nested_error = McpError::Other(anyhow::anyhow!("Level {}: {:?}", i, nested_error));
     }
-    let _ = format!("{nested_error}"); // Should not panic even with deep nesting
+    let display = format!("{nested_error}"); // Should not panic even with deep nesting
+    assert!(!display.is_empty());
+    // Deep nesting should still produce some output
+    assert!(display.len() > 100); // Should have accumulated some text
 
     // Test with control characters
     let error = McpError::server_error("server\r\n\t", "message\x00\x01\x02");
-    let _ = format!("{error}"); // Should not panic
+    let display = format!("{error}"); // Should not panic
+    assert!(!display.is_empty());
+    // Control characters should be handled somehow
+    assert!(display.contains("server") || display.contains("message"));
 }
 
 /// Test platform-specific install instructions formatting
