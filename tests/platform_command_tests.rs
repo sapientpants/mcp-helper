@@ -300,10 +300,28 @@ fn test_verbose_mode_behavior() {
         .get_command_for_platform(&PathBuf::from("test-server"), &test_args)
         .unwrap();
 
-    // Commands should be identical regardless of verbose mode
-    assert_eq!(verbose_cmd, "npx");
+    // Commands should be platform-appropriate
+    #[cfg(target_os = "windows")]
+    {
+        // On Windows, if npx.cmd is found, it uses cmd.exe
+        assert!(verbose_cmd == "cmd.exe" || verbose_cmd == "npx");
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        assert_eq!(verbose_cmd, "npx");
+    }
+
     assert_eq!(quiet_cmd, "npx");
-    assert_eq!(verbose_args, quiet_args);
+
+    // Arguments might differ on Windows when using cmd.exe
+    if verbose_cmd == "cmd.exe" {
+        // When using cmd.exe, args are prefixed with /c npx.cmd
+        assert!(verbose_args.len() >= 3);
+        assert_eq!(verbose_args[0], "/c");
+    } else {
+        assert_eq!(verbose_args, quiet_args);
+    }
 }
 
 #[test]

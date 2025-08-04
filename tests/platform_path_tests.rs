@@ -310,8 +310,21 @@ fn test_pathbuf_compatibility() {
     // Verify paths are valid PathBuf regardless of platform
     assert!(!normalized_windows.is_empty());
     assert!(!normalized_unix.is_empty());
-    assert_eq!(path_windows.components().count(), 3);
-    assert_eq!(path_unix.components().count(), 3);
+
+    // Component count depends on current platform
+    #[cfg(target_os = "windows")]
+    {
+        assert_eq!(path_windows.components().count(), 3);
+        assert_eq!(path_unix.components().count(), 3);
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        // On Unix, Windows paths with backslashes are treated as single filename
+        assert_eq!(path_windows.components().count(), 1);
+        // On Unix, this path is normalized properly
+        assert_eq!(path_unix.components().count(), 3);
+    }
 }
 
 #[test]

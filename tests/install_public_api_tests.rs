@@ -114,6 +114,7 @@ fn test_execute_with_various_server_names() {
                 msg.contains("clients") ||
                 msg.contains("dependency") ||
                 msg.contains("not installed") ||
+                msg.contains("Failed to execute") || // Docker command fails in CI
                 msg.contains("security") ||
                 msg.contains("short") ||  // Some servers might trigger security warnings
                 msg.contains("terminal") || // Test environment lacks terminal
