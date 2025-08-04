@@ -52,8 +52,16 @@ fn test_get_command_for_npx_package() {
 
     #[cfg(target_os = "windows")]
     {
-        assert!(command == "npx.cmd" || command == "npx");
-        assert!(cmd_args.contains(&"@modelcontextprotocol/server-filesystem".to_string()));
+        assert!(command == "npx.cmd" || command == "npx" || command == "cmd.exe");
+        if command == "cmd.exe" {
+            // When using cmd.exe, args should contain /c npx.cmd
+            assert!(cmd_args.len() >= 3);
+            assert_eq!(cmd_args[0], "/c");
+            assert!(cmd_args[1] == "npx.cmd" || cmd_args[1] == "npx");
+            assert!(cmd_args[2..].contains(&"@modelcontextprotocol/server-filesystem".to_string()));
+        } else {
+            assert!(cmd_args.contains(&"@modelcontextprotocol/server-filesystem".to_string()));
+        }
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -140,7 +148,7 @@ fn test_scoped_npm_package_handling() {
         let (command, cmd_args) = result.unwrap();
 
         #[cfg(target_os = "windows")]
-        assert!(command == "npx.cmd" || command == "npx");
+        assert!(command == "npx.cmd" || command == "npx" || command == "cmd.exe");
 
         #[cfg(not(target_os = "windows"))]
         assert_eq!(command, "npx");
@@ -263,7 +271,7 @@ fn test_npx_with_version() {
         let (command, cmd_args) = result.unwrap();
 
         #[cfg(target_os = "windows")]
-        assert!(command == "npx.cmd" || command == "npx");
+        assert!(command == "npx.cmd" || command == "npx" || command == "cmd.exe");
 
         #[cfg(not(target_os = "windows"))]
         assert_eq!(command, "npx");
@@ -308,13 +316,19 @@ fn test_empty_arguments() {
     let (command, cmd_args) = result.unwrap();
 
     #[cfg(target_os = "windows")]
-    assert!(command == "npx.cmd" || command == "npx");
+    assert!(command == "npx.cmd" || command == "npx" || command == "cmd.exe");
 
     #[cfg(not(target_os = "windows"))]
     assert_eq!(command, "npx");
 
-    // Should only have the server name
-    assert_eq!(cmd_args, vec!["simple-server"]);
+    // Should have the server name (and possibly cmd.exe wrapper args)
+    if command == "cmd.exe" {
+        assert!(cmd_args.len() >= 3);
+        assert_eq!(cmd_args[0], "/c");
+        assert!(cmd_args.contains(&"simple-server".to_string()));
+    } else {
+        assert_eq!(cmd_args, vec!["simple-server"]);
+    }
 }
 
 #[test]
@@ -335,7 +349,7 @@ fn test_relative_path_handling() {
 
         // ServerRunner treats relative paths as npm packages since they don't exist as files
         // File type detection for relative paths is not yet implemented
-        assert!(command == "npx" || command == "npx.cmd");
+        assert!(command == "npx" || command == "npx.cmd" || command == "cmd.exe");
 
         assert!(!cmd_args.is_empty());
     }
@@ -394,7 +408,7 @@ fn test_platform_specific_command_selection() {
             let result = runner.get_command_for_platform(&PathBuf::from("test"), &[]);
             assert!(result.is_ok());
             let (cmd, _) = result.unwrap();
-            assert!(cmd == "npx.cmd" || cmd == "npx");
+            assert!(cmd == "npx.cmd" || cmd == "npx" || cmd == "cmd.exe");
         }
         Platform::MacOS | Platform::Linux => {
             let result = runner.get_command_for_platform(&PathBuf::from("test"), &[]);
