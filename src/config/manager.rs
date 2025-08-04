@@ -238,7 +238,14 @@ impl ConfigManager {
     }
 
     fn get_history_dir() -> Result<PathBuf> {
-        let base_dir = directories::ProjectDirs::from("", "", "mcp-helper")
+        // Check if XDG_DATA_HOME is set (for testing)
+        if let Ok(xdg_data) = std::env::var("XDG_DATA_HOME") {
+            return Ok(PathBuf::from(xdg_data)
+                .join("mcp-helper")
+                .join("config-history"));
+        }
+
+        let base_dir = directories::ProjectDirs::from("com", "mcp", "mcp-helper")
             .context("Failed to get project directories")?;
         Ok(base_dir.data_dir().join("config-history"))
     }
