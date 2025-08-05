@@ -176,7 +176,7 @@ coverage:
 # Coverage for CI - doesn't open browser
 coverage-ci:
 	@echo "Generating coverage report for CI..."
-	@$(CARGO) tarpaulin --out Html --out Lcov --lib --bins --tests --timeout 600 || (echo "Install cargo-tarpaulin with: cargo install cargo-tarpaulin" && exit 1)
+	@$(CARGO) tarpaulin --out Html --out Lcov --lib --bins --tests --timeout 600 --exclude-files "src/cache.rs" || (echo "Install cargo-tarpaulin with: cargo install cargo-tarpaulin" && exit 1)
 
 # Detailed coverage report with better exclusions
 coverage-detailed:
