@@ -176,7 +176,15 @@ coverage:
 # Coverage for CI - doesn't open browser
 coverage-ci:
 	@echo "Generating coverage report for CI..."
-	@$(CARGO) tarpaulin --out Html --out Lcov --lib --bins --tests --timeout 600 --exclude-files "src/cache.rs" --exclude-files "tests/cache_error_tests.rs" || (echo "Install cargo-tarpaulin with: cargo install cargo-tarpaulin" && exit 1)
+	@$(CARGO) tarpaulin --out Html --out Lcov --lib --bins --tests --timeout 600 \
+		--exclude-files "src/cache.rs" \
+		--exclude-files "tests/cache_error_tests.rs" \
+		--exclude-files "tests/runner_advanced_tests.rs" \
+		--exclude-files "tests/runner_integration_tests.rs" \
+		--exclude-files "tests/e2e_installation_tests.rs" \
+		--exclude-files "tests/npm_install_integration_test.rs" \
+		--exclude-files "tests/network_failure_tests.rs" \
+		|| (echo "Install cargo-tarpaulin with: cargo install cargo-tarpaulin" && exit 1)
 
 # Detailed coverage report with better exclusions
 coverage-detailed:
