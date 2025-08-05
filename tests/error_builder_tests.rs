@@ -465,3 +465,357 @@ fn test_complex_config_scenario() {
         _ => panic!("Expected ConfigurationRequired variant"),
     }
 }
+
+#[test]
+fn test_error_builder_struct() {
+    // Test that ErrorBuilder is a unit struct
+    let _ = ErrorBuilder;
+    // This ensures the struct itself is covered
+}
+
+#[test]
+fn test_missing_dependency_builder_struct_fields() {
+    // Test that builder fields are set correctly
+    let builder = ErrorBuilder::missing_dependency("test-dep");
+    // Cannot access private fields directly, but we test the build output
+    let error = builder.build();
+
+    match error {
+        McpError::MissingDependency {
+            dependency,
+            required_version,
+            install_instructions,
+        } => {
+            assert_eq!(dependency, "test-dep");
+            assert_eq!(required_version, None);
+            // Default InstallInstructions should have empty vectors
+            assert_eq!(install_instructions.windows.len(), 0);
+            assert_eq!(install_instructions.macos.len(), 0);
+            assert_eq!(install_instructions.linux.len(), 0);
+        }
+        _ => panic!("Expected MissingDependency"),
+    }
+}
+
+#[test]
+fn test_version_mismatch_builder_struct_fields() {
+    // Test that VersionMismatchBuilder fields are initialized correctly
+    let builder = ErrorBuilder::version_mismatch("test-dep");
+    let error = builder.build();
+
+    match error {
+        McpError::VersionMismatch {
+            dependency,
+            current_version,
+            required_version,
+            upgrade_instructions,
+        } => {
+            assert_eq!(dependency, "test-dep");
+            assert_eq!(current_version, ""); // Default empty string
+            assert_eq!(required_version, ""); // Default empty string
+                                              // Default InstallInstructions
+            assert_eq!(upgrade_instructions.windows.len(), 0);
+            assert_eq!(upgrade_instructions.macos.len(), 0);
+            assert_eq!(upgrade_instructions.linux.len(), 0);
+        }
+        _ => panic!("Expected VersionMismatch"),
+    }
+}
+
+#[test]
+fn test_config_required_builder_struct_fields() {
+    // Test that ConfigRequiredBuilder fields are initialized correctly
+    let builder = ErrorBuilder::config_required("test-server");
+    let error = builder.build();
+
+    match error {
+        McpError::ConfigurationRequired {
+            server_name,
+            missing_fields,
+            field_descriptions,
+        } => {
+            assert_eq!(server_name, "test-server");
+            assert_eq!(missing_fields, Vec::<String>::new()); // Empty vec
+            assert_eq!(field_descriptions, Vec::<(String, String)>::new()); // Empty vec
+        }
+        _ => panic!("Expected ConfigurationRequired"),
+    }
+}
+
+#[test]
+fn test_missing_dependency_builder_mutation() {
+    // Test that builder mutations work correctly
+    let mut builder = ErrorBuilder::missing_dependency("dep");
+
+    // Test version mutation
+    builder = builder.version("1.0.0");
+    let error = builder.build();
+
+    match error {
+        McpError::MissingDependency {
+            required_version, ..
+        } => {
+            assert_eq!(required_version, Some("1.0.0".to_string()));
+        }
+        _ => panic!("Expected MissingDependency"),
+    }
+}
+
+#[test]
+fn test_version_mismatch_builder_mutation() {
+    // Test that builder mutations work correctly
+    let mut builder = ErrorBuilder::version_mismatch("dep");
+
+    // Test installed version mutation
+    builder = builder.installed("1.0.0");
+    // Test required version mutation
+    builder = builder.required("2.0.0");
+
+    let error = builder.build();
+
+    match error {
+        McpError::VersionMismatch {
+            current_version,
+            required_version,
+            ..
+        } => {
+            assert_eq!(current_version, "1.0.0");
+            assert_eq!(required_version, "2.0.0");
+        }
+        _ => panic!("Expected VersionMismatch"),
+    }
+}
+
+#[test]
+fn test_config_required_fields_iterator_implementation() {
+    // Test the generic iterator implementation with different types
+    let fields_vec: Vec<(&str, &str)> = vec![("field1", "desc1"), ("field2", "desc2")];
+
+    let error = ErrorBuilder::config_required("server")
+        .fields(fields_vec)
+        .build();
+
+    match error {
+        McpError::ConfigurationRequired {
+            missing_fields,
+            field_descriptions,
+            ..
+        } => {
+            assert_eq!(missing_fields.len(), 2);
+            assert_eq!(field_descriptions.len(), 2);
+        }
+        _ => panic!("Expected ConfigurationRequired"),
+    }
+
+    // Test with array
+    let fields_array = [("field3", "desc3"), ("field4", "desc4")];
+
+    let error = ErrorBuilder::config_required("server2")
+        .fields(fields_array)
+        .build();
+
+    match error {
+        McpError::ConfigurationRequired { missing_fields, .. } => {
+            assert_eq!(missing_fields.len(), 2);
+            assert_eq!(missing_fields[0], "field3");
+            assert_eq!(missing_fields[1], "field4");
+        }
+        _ => panic!("Expected ConfigurationRequired"),
+    }
+}
+
+#[test]
+fn test_config_required_fields_string_conversion() {
+    // Test Into<String> conversion in fields iterator
+    let fields: Vec<(String, String)> = vec![
+        ("field1".to_string(), "desc1".to_string()),
+        ("field2".to_string(), "desc2".to_string()),
+    ];
+
+    let error = ErrorBuilder::config_required("server")
+        .fields(fields)
+        .build();
+
+    match error {
+        McpError::ConfigurationRequired {
+            missing_fields,
+            field_descriptions,
+            ..
+        } => {
+            assert_eq!(missing_fields.len(), 2);
+            assert_eq!(field_descriptions[0].0, "field1");
+            assert_eq!(field_descriptions[0].1, "desc1");
+        }
+        _ => panic!("Expected ConfigurationRequired"),
+    }
+}
+
+#[test]
+fn test_builder_edge_cases() {
+    // Test with empty strings
+    let error = ErrorBuilder::missing_dependency("").build();
+    match error {
+        McpError::MissingDependency { dependency, .. } => {
+            assert_eq!(dependency, "");
+        }
+        _ => panic!("Expected MissingDependency"),
+    }
+
+    // Test with very long strings
+    let long_string = "a".repeat(1000);
+    let error = ErrorBuilder::config_required(&long_string)
+        .field(&long_string, &long_string)
+        .build();
+
+    match error {
+        McpError::ConfigurationRequired {
+            server_name,
+            missing_fields,
+            field_descriptions,
+        } => {
+            assert_eq!(server_name, long_string);
+            assert_eq!(missing_fields[0], long_string);
+            assert_eq!(field_descriptions[0].1, long_string);
+        }
+        _ => panic!("Expected ConfigurationRequired"),
+    }
+}
+
+#[test]
+fn test_install_instructions_boxing() {
+    // Test that InstallInstructions are properly boxed
+    let large_instructions = InstallInstructions {
+        windows: (0..100)
+            .map(|i| InstallMethod {
+                name: format!("method{i}"),
+                command: format!("command{i}"),
+                description: Some(format!("desc{i}")),
+            })
+            .collect(),
+        macos: vec![],
+        linux: vec![],
+    };
+
+    // Test with MissingDependency
+    let error1 = ErrorBuilder::missing_dependency("dep1")
+        .instructions(large_instructions.clone())
+        .build();
+
+    match error1 {
+        McpError::MissingDependency {
+            install_instructions,
+            ..
+        } => {
+            assert_eq!(install_instructions.windows.len(), 100);
+        }
+        _ => panic!("Expected MissingDependency"),
+    }
+
+    // Test with VersionMismatch
+    let error2 = ErrorBuilder::version_mismatch("dep2")
+        .instructions(large_instructions)
+        .build();
+
+    match error2 {
+        McpError::VersionMismatch {
+            upgrade_instructions,
+            ..
+        } => {
+            assert_eq!(upgrade_instructions.windows.len(), 100);
+        }
+        _ => panic!("Expected VersionMismatch"),
+    }
+}
+
+#[test]
+fn test_unicode_and_special_characters() {
+    // Test with unicode
+    let error = ErrorBuilder::missing_dependency("Python 🐍")
+        .version("≥3.8")
+        .build();
+
+    match error {
+        McpError::MissingDependency {
+            dependency,
+            required_version,
+            ..
+        } => {
+            assert_eq!(dependency, "Python 🐍");
+            assert_eq!(required_version, Some("≥3.8".to_string()));
+        }
+        _ => panic!("Expected MissingDependency"),
+    }
+
+    // Test with newlines and special characters
+    let error = ErrorBuilder::config_required("server\nwith\nnewlines")
+        .field("field\twith\ttabs", "desc\\with\\backslashes")
+        .build();
+
+    match error {
+        McpError::ConfigurationRequired {
+            server_name,
+            missing_fields,
+            field_descriptions,
+        } => {
+            assert_eq!(server_name, "server\nwith\nnewlines");
+            assert_eq!(missing_fields[0], "field\twith\ttabs");
+            assert_eq!(field_descriptions[0].1, "desc\\with\\backslashes");
+        }
+        _ => panic!("Expected ConfigurationRequired"),
+    }
+}
+
+#[test]
+fn test_builder_lifetimes() {
+    // Test that builders work with references of different lifetimes
+    let dep_name = String::from("dependency");
+    let version = String::from("1.0.0");
+
+    let error = ErrorBuilder::missing_dependency(&dep_name)
+        .version(&version)
+        .build();
+
+    // The original strings should still be valid
+    assert_eq!(dep_name, "dependency");
+    assert_eq!(version, "1.0.0");
+
+    match error {
+        McpError::MissingDependency {
+            dependency,
+            required_version,
+            ..
+        } => {
+            assert_eq!(dependency, dep_name);
+            assert_eq!(required_version, Some(version));
+        }
+        _ => panic!("Expected MissingDependency"),
+    }
+}
+
+#[test]
+fn test_config_required_field_clone_behavior() {
+    // Test that field names are properly cloned in the fields() method
+    let field_name = String::from("field1");
+    let field_desc = String::from("description1");
+
+    let error = ErrorBuilder::config_required("server")
+        .fields(vec![(field_name.clone(), field_desc.clone())])
+        .build();
+
+    // Original strings should still be valid
+    assert_eq!(field_name, "field1");
+    assert_eq!(field_desc, "description1");
+
+    match error {
+        McpError::ConfigurationRequired {
+            missing_fields,
+            field_descriptions,
+            ..
+        } => {
+            assert_eq!(missing_fields[0], field_name);
+            assert_eq!(field_descriptions[0].0, field_name);
+            assert_eq!(field_descriptions[0].1, field_desc);
+        }
+        _ => panic!("Expected ConfigurationRequired"),
+    }
+}
