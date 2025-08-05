@@ -184,6 +184,7 @@ coverage-ci:
 		--exclude-files "tests/e2e_installation_tests.rs" \
 		--exclude-files "tests/npm_install_integration_test.rs" \
 		--exclude-files "tests/network_failure_tests.rs" \
+		--exclude-files "tests/error_handling_runner_tests.rs" \
 		|| (echo "Install cargo-tarpaulin with: cargo install cargo-tarpaulin" && exit 1)
 
 # Detailed coverage report with better exclusions
