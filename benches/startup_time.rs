@@ -11,7 +11,7 @@ use std::time::Instant;
 fn bench_startup_version(c: &mut Criterion) {
     c.bench_function("startup_version", |b| {
         b.iter(|| {
-            let output = Command::new("./target/release/mcp-helper")
+            let output = Command::new("./target/release/mcp")
                 .arg("--version")
                 .output()
                 .expect("Failed to execute command");
@@ -25,7 +25,7 @@ fn bench_startup_version(c: &mut Criterion) {
 fn bench_startup_help(c: &mut Criterion) {
     c.bench_function("startup_help", |b| {
         b.iter(|| {
-            let output = Command::new("./target/release/mcp-helper")
+            let output = Command::new("./target/release/mcp")
                 .arg("--help")
                 .output()
                 .expect("Failed to execute command");
@@ -39,7 +39,7 @@ fn bench_startup_help(c: &mut Criterion) {
 fn bench_startup_subcommand_help(c: &mut Criterion) {
     c.bench_function("startup_run_help", |b| {
         b.iter(|| {
-            let output = Command::new("./target/release/mcp-helper")
+            let output = Command::new("./target/release/mcp")
                 .args(["help", "run"])
                 .output()
                 .expect("Failed to execute command");

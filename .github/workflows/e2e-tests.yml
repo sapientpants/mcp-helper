@@ -70,9 +70,9 @@ jobs:
       shell: bash
       run: |
         echo "=== Startup Time Benchmark ==="
-        BINARY_PATH="./target/release/mcp-helper"
+        BINARY_PATH="./target/release/mcp"
         if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-          BINARY_PATH="./target/release/mcp-helper.exe"
+          BINARY_PATH="./target/release/mcp.exe"
         fi
         
         # Warm up

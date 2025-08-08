@@ -58,14 +58,14 @@ jobs:
         echo "Measuring 10 runs of --version flag..."
         
         for i in {1..10}; do
-          /usr/bin/time -f "Run $i: %e seconds" ./target/release/mcp-helper --version > /dev/null
+          /usr/bin/time -f "Run $i: %e seconds" ./target/release/mcp --version > /dev/null
         done
         
         echo ""
         echo "Measuring 10 runs of --help flag..."
         
         for i in {1..10}; do
-          /usr/bin/time -f "Run $i: %e seconds" ./target/release/mcp-helper --help > /dev/null
+          /usr/bin/time -f "Run $i: %e seconds" ./target/release/mcp --help > /dev/null
         done
 
     - name: Upload benchmark artifacts
