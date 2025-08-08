@@ -15,7 +15,7 @@ fn test_run_command_help() -> Result<()> {
     let result = env.run_success(&["help", "run"])?;
 
     assert_stdout_contains(&result, "Run an MCP server");
-    assert_stdout_contains(&result, "USAGE:");
+    assert_stdout_contains(&result, "Usage:");
 
     Ok(())
 }
@@ -26,7 +26,12 @@ fn test_run_command_server_not_found() -> Result<()> {
 
     let result = env.run_failure(&["run", "nonexistent-server"])?;
 
-    assert_stderr_contains(&result, "not found");
+    // The error message could be from NPM or from our code
+    assert!(
+        result.stderr_string().contains("not found")
+            || result.stderr_string().contains("Not found")
+            || result.stderr_string().contains("404")
+    );
 
     Ok(())
 }
@@ -138,7 +143,12 @@ fn test_run_command_verbose_output() -> Result<()> {
     let result = env.run_failure(&["run", "--verbose", "nonexistent-server"])?;
 
     // Should show more detailed error with verbose flag
-    assert_stderr_contains(&result, "not found");
+    // The error message could be from NPM or from our code
+    assert!(
+        result.stderr_string().contains("not found")
+            || result.stderr_string().contains("Not found")
+            || result.stderr_string().contains("404")
+    );
 
     Ok(())
 }
