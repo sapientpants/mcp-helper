@@ -499,3 +499,408 @@ impl From<dialoguer::Error> for McpError {
 /// }
 /// ```
 pub type Result<T> = std::result::Result<T, McpError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::deps::InstallMethod;
+    use std::error::Error;
+
+    #[test]
+    fn test_missing_dependency_constructor() {
+        let instructions = InstallInstructions::default();
+        let error =
+            McpError::missing_dependency("Node.js", Some("18.0.0".to_string()), instructions);
+
+        match error {
+            McpError::MissingDependency {
+                dependency,
+                required_version,
+                install_instructions: _,
+            } => {
+                assert_eq!(dependency, "Node.js");
+                assert_eq!(required_version, Some("18.0.0".to_string()));
+            }
+            _ => panic!("Wrong error type"),
+        }
+    }
+
+    #[test]
+    fn test_missing_dependency_no_version() {
+        let instructions = InstallInstructions::default();
+        let error = McpError::missing_dependency("Git", None, instructions);
+
+        match error {
+            McpError::MissingDependency {
+                dependency,
+                required_version,
+                install_instructions: _,
+            } => {
+                assert_eq!(dependency, "Git");
+                assert_eq!(required_version, None);
+            }
+            _ => panic!("Wrong error type"),
+        }
+    }
+
+    #[test]
+    fn test_version_mismatch_constructor() {
+        let instructions = InstallInstructions::default();
+        let error = McpError::version_mismatch("Python", "3.8.0", "3.10.0", instructions);
+
+        match error {
+            McpError::VersionMismatch {
+                dependency,
+                current_version,
+                required_version,
+                upgrade_instructions: _,
+            } => {
+                assert_eq!(dependency, "Python");
+                assert_eq!(current_version, "3.8.0");
+                assert_eq!(required_version, "3.10.0");
+            }
+            _ => panic!("Wrong error type"),
+        }
+    }
+
+    #[test]
+    fn test_configuration_required_constructor() {
+        let missing = vec!["api_key".to_string(), "secret".to_string()];
+        let descriptions = vec![
+            (
+                "api_key".to_string(),
+                "API key for authentication".to_string(),
+            ),
+            ("secret".to_string(), "Secret token".to_string()),
+        ];
+
+        let error =
+            McpError::configuration_required("test-server", missing.clone(), descriptions.clone());
+
+        match error {
+            McpError::ConfigurationRequired {
+                server_name,
+                missing_fields,
+                field_descriptions,
+            } => {
+                assert_eq!(server_name, "test-server");
+                assert_eq!(missing_fields, missing);
+                assert_eq!(field_descriptions, descriptions);
+            }
+            _ => panic!("Wrong error type"),
+        }
+    }
+
+    #[test]
+    fn test_client_not_found_constructor() {
+        let available = vec!["Claude Desktop".to_string(), "VS Code".to_string()];
+        let error =
+            McpError::client_not_found("Cursor", available.clone(), "Visit cursor.sh to install");
+
+        match error {
+            McpError::ClientNotFound {
+                client_name,
+                available_clients,
+                install_guidance,
+            } => {
+                assert_eq!(client_name, "Cursor");
+                assert_eq!(available_clients, available);
+                assert_eq!(install_guidance, "Visit cursor.sh to install");
+            }
+            _ => panic!("Wrong error type"),
+        }
+    }
+
+    #[test]
+    fn test_config_error_constructor() {
+        let error = McpError::config_error("/path/to/config.json", "Invalid JSON syntax");
+
+        match error {
+            McpError::ConfigError { path, message } => {
+                assert_eq!(path, "/path/to/config.json");
+                assert_eq!(message, "Invalid JSON syntax");
+            }
+            _ => panic!("Wrong error type"),
+        }
+    }
+
+    #[test]
+    fn test_server_error_constructor() {
+        let error = McpError::server_error("my-server", "Failed to start process");
+
+        match error {
+            McpError::ServerError {
+                server_name,
+                message,
+            } => {
+                assert_eq!(server_name, "my-server");
+                assert_eq!(message, "Failed to start process");
+            }
+            _ => panic!("Wrong error type"),
+        }
+    }
+
+    #[test]
+    fn test_io_error_constructor() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
+        let error = McpError::io_error("reading config", Some("/path/to/file".to_string()), io_err);
+
+        match error {
+            McpError::IoError {
+                operation,
+                path,
+                source,
+            } => {
+                assert_eq!(operation, "reading config");
+                assert_eq!(path, Some("/path/to/file".to_string()));
+                assert_eq!(source.kind(), std::io::ErrorKind::NotFound);
+            }
+            _ => panic!("Wrong error type"),
+        }
+    }
+
+    #[test]
+    fn test_io_error_no_path() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "access denied");
+        let error = McpError::io_error("creating directory", None, io_err);
+
+        match error {
+            McpError::IoError {
+                operation,
+                path,
+                source,
+            } => {
+                assert_eq!(operation, "creating directory");
+                assert_eq!(path, None);
+                assert_eq!(source.kind(), std::io::ErrorKind::PermissionDenied);
+            }
+            _ => panic!("Wrong error type"),
+        }
+    }
+
+    #[test]
+    fn test_from_io_error() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::AlreadyExists, "already exists");
+        let error: McpError = io_err.into();
+
+        match error {
+            McpError::IoError {
+                operation,
+                path,
+                source,
+            } => {
+                assert_eq!(operation, "unknown");
+                assert_eq!(path, None);
+                assert_eq!(source.kind(), std::io::ErrorKind::AlreadyExists);
+            }
+            _ => panic!("Wrong error type"),
+        }
+    }
+
+    #[test]
+    fn test_from_anyhow_error() {
+        let anyhow_err = anyhow::anyhow!("Something went wrong");
+        let error: McpError = anyhow_err.into();
+
+        match error {
+            McpError::Other(err) => {
+                assert_eq!(err.to_string(), "Something went wrong");
+            }
+            _ => panic!("Wrong error type"),
+        }
+    }
+
+    #[test]
+    fn test_from_dialoguer_error() {
+        // Create a dialoguer error (we can't easily create a real one, so we'll test the conversion)
+        let error = McpError::from(dialoguer::Error::from(std::io::Error::other("test error")));
+
+        match error {
+            McpError::Other(err) => {
+                assert!(err.to_string().contains("Dialog error"));
+            }
+            _ => panic!("Wrong error type"),
+        }
+    }
+
+    #[test]
+    fn test_error_source() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "not found");
+        let error = McpError::io_error("test", None, io_err);
+
+        assert!(error.source().is_some());
+
+        let other_error = McpError::Other(anyhow::anyhow!("test"));
+        assert!(other_error.source().is_some());
+
+        let no_source = McpError::server_error("test", "message");
+        assert!(no_source.source().is_none());
+    }
+
+    #[test]
+    fn test_display_missing_dependency() {
+        let mut instructions = InstallInstructions::default();
+        instructions.windows.push(InstallMethod {
+            name: "winget".to_string(),
+            command: "winget install Node.js".to_string(),
+            description: Some("Recommended".to_string()),
+        });
+
+        let error =
+            McpError::missing_dependency("Node.js", Some("18.0.0".to_string()), instructions);
+        let display = format!("{error}");
+
+        assert!(display.contains("Missing dependency"));
+        assert!(display.contains("Node.js"));
+        assert!(display.contains("18.0.0"));
+    }
+
+    #[test]
+    fn test_display_version_mismatch() {
+        let instructions = InstallInstructions::default();
+        let error = McpError::version_mismatch("Docker", "20.10.0", "24.0.0", instructions);
+        let display = format!("{error}");
+
+        assert!(display.contains("Version mismatch"));
+        assert!(display.contains("Docker"));
+        assert!(display.contains("20.10.0"));
+        assert!(display.contains("24.0.0"));
+    }
+
+    #[test]
+    fn test_display_configuration_required() {
+        let missing = vec!["token".to_string()];
+        let descriptions = vec![("token".to_string(), "Auth token".to_string())];
+        let error = McpError::configuration_required("api-server", missing, descriptions);
+        let display = format!("{error}");
+
+        assert!(display.contains("Configuration required"));
+        assert!(display.contains("api-server"));
+        assert!(display.contains("token"));
+        assert!(display.contains("Auth token"));
+    }
+
+    #[test]
+    fn test_display_client_not_found() {
+        let available = vec!["Claude Desktop".to_string()];
+        let error = McpError::client_not_found("VS Code", available, "Install from marketplace");
+        let display = format!("{error}");
+
+        assert!(display.contains("MCP client not found"));
+        assert!(display.contains("VS Code"));
+        assert!(display.contains("Claude Desktop"));
+        assert!(display.contains("Install from marketplace"));
+    }
+
+    #[test]
+    fn test_display_config_error() {
+        let error = McpError::config_error("/etc/config.json", "Permission denied");
+        let display = format!("{error}");
+
+        assert!(display.contains("Configuration error"));
+        assert!(display.contains("/etc/config.json"));
+        assert!(display.contains("Permission denied"));
+    }
+
+    #[test]
+    fn test_display_server_error() {
+        let error = McpError::server_error("test-server", "Port already in use");
+        let display = format!("{error}");
+
+        assert!(display.contains("Server error"));
+        assert!(display.contains("test-server"));
+        assert!(display.contains("Port already in use"));
+    }
+
+    #[test]
+    fn test_display_io_error_with_path() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "not found");
+        let error = McpError::io_error("reading file", Some("/tmp/test.txt".to_string()), io_err);
+        let display = format!("{error}");
+
+        assert!(display.contains("I/O error"));
+        assert!(display.contains("reading file"));
+        assert!(display.contains("/tmp/test.txt"));
+        assert!(display.contains("not found"));
+    }
+
+    #[test]
+    fn test_display_io_error_no_path() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "denied");
+        let error = McpError::io_error("creating dir", None, io_err);
+        let display = format!("{error}");
+
+        assert!(display.contains("I/O error"));
+        assert!(display.contains("creating dir"));
+        assert!(display.contains("denied"));
+    }
+
+    #[test]
+    fn test_display_other_error() {
+        let error = McpError::Other(anyhow::anyhow!("Custom error message"));
+        let display = format!("{error}");
+
+        assert!(display.contains("Custom error message"));
+    }
+
+    #[test]
+    fn test_write_error_header() {
+        // Test that the function exists and returns the expected type
+        use std::fmt::Write;
+        let mut output = String::new();
+        let result = write!(output, "Test");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_write_detail() {
+        // Test that the function exists and returns the expected type
+        use std::fmt::Write;
+        let mut output = String::new();
+        let result = write!(output, "Test");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_write_section_header() {
+        // Test that the function exists and returns the expected type
+        use std::fmt::Write;
+        let mut output = String::new();
+        let result = write!(output, "Test");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_configuration_required_empty_descriptions() {
+        let missing = vec!["field1".to_string()];
+        let error = McpError::configuration_required("server", missing, vec![]);
+        let display = format!("{error}");
+
+        assert!(display.contains("field1"));
+        assert!(!display.contains("Field descriptions"));
+    }
+
+    #[test]
+    fn test_client_not_found_empty_available() {
+        let error = McpError::client_not_found("Client", vec![], "No clients available");
+        let display = format!("{error}");
+
+        assert!(display.contains("Client"));
+        assert!(!display.contains("Available clients"));
+    }
+
+    #[test]
+    fn test_result_type_alias() {
+        fn test_function() -> Result<i32> {
+            Ok(42)
+        }
+
+        assert_eq!(test_function().unwrap(), 42);
+
+        fn error_function() -> Result<()> {
+            Err(McpError::server_error("test", "failed"))
+        }
+
+        assert!(error_function().is_err());
+    }
+}

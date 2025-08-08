@@ -48,6 +48,7 @@
 pub mod cache;
 pub mod client;
 pub mod config;
+pub mod core;
 pub mod deps;
 pub mod error;
 pub mod install;
@@ -56,6 +57,10 @@ pub mod runner;
 pub mod security;
 pub mod server;
 pub mod utils;
+
+// Test utilities module (always available in development/test builds)
+#[cfg(any(test, debug_assertions))]
+pub mod test_utils;
 
 // Re-export Platform enum so it can be used in tests
 pub use runner::Platform;

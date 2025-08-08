@@ -218,3 +218,365 @@ impl Default for ClaudeDesktopClient {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_claude_desktop_client_new() {
+        let client = ClaudeDesktopClient::new();
+        assert!(!client.config_path.as_os_str().is_empty());
+    }
+
+    #[test]
+    fn test_claude_desktop_client_default() {
+        let client = ClaudeDesktopClient::default();
+        assert!(!client.config_path.as_os_str().is_empty());
+    }
+
+    #[test]
+    fn test_get_config_path_windows() {
+        #[cfg(target_os = "windows")]
+        {
+            // Test with APPDATA set
+            std::env::set_var("APPDATA", "C:\\Users\\Test\\AppData\\Roaming");
+            let path = ClaudeDesktopClient::get_config_path();
+            assert!(path.to_str().unwrap().contains("Claude"));
+            assert!(path
+                .to_str()
+                .unwrap()
+                .contains("claude_desktop_config.json"));
+            std::env::remove_var("APPDATA");
+        }
+    }
+
+    #[test]
+    fn test_get_config_path_macos() {
+        #[cfg(target_os = "macos")]
+        {
+            let path = ClaudeDesktopClient::get_config_path();
+            assert!(path.to_str().unwrap().contains("Library"));
+            assert!(path.to_str().unwrap().contains("Application Support"));
+            assert!(path.to_str().unwrap().contains("Claude"));
+        }
+    }
+
+    #[test]
+    fn test_get_config_path_linux() {
+        #[cfg(target_os = "linux")]
+        {
+            let path = ClaudeDesktopClient::get_config_path();
+            assert!(path.to_str().unwrap().contains("Claude"));
+            assert!(path
+                .to_str()
+                .unwrap()
+                .contains("claude_desktop_config.json"));
+        }
+    }
+
+    #[test]
+    fn test_read_config_missing_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("nonexistent.json");
+
+        let client = ClaudeDesktopClient {
+            config_path: config_path.clone(),
+        };
+
+        let config = client.read_config().unwrap();
+        assert!(config.mcp_servers.is_empty());
+        assert!(config.other.is_empty());
+    }
+
+    #[test]
+    fn test_read_config_valid_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("config.json");
+
+        let json_content = r#"{
+            "mcpServers": {
+                "test-server": {
+                    "command": "node",
+                    "args": ["server.js"],
+                    "env": {"KEY": "value"}
+                }
+            },
+            "otherField": "value"
+        }"#;
+
+        fs::write(&config_path, json_content).unwrap();
+
+        let client = ClaudeDesktopClient {
+            config_path: config_path.clone(),
+        };
+
+        let config = client.read_config().unwrap();
+        assert_eq!(config.mcp_servers.len(), 1);
+        assert!(config.mcp_servers.contains_key("test-server"));
+        assert_eq!(config.other.len(), 1);
+        assert!(config.other.contains_key("otherField"));
+    }
+
+    #[test]
+    fn test_write_config() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("test").join("config.json");
+
+        let client = ClaudeDesktopClient {
+            config_path: config_path.clone(),
+        };
+
+        let mut config = ClaudeConfig {
+            mcp_servers: Map::new(),
+            other: Map::new(),
+        };
+
+        config.mcp_servers.insert(
+            "server1".to_string(),
+            serde_json::json!({
+                "command": "python",
+                "args": ["-m", "server"],
+                "env": {}
+            }),
+        );
+
+        client.write_config(&config).unwrap();
+
+        assert!(config_path.exists());
+        let content = fs::read_to_string(&config_path).unwrap();
+        assert!(content.contains("mcpServers"));
+        assert!(content.contains("server1"));
+    }
+
+    #[test]
+    fn test_create_backup() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("config.json");
+
+        fs::write(&config_path, "original content").unwrap();
+
+        let client = ClaudeDesktopClient {
+            config_path: config_path.clone(),
+        };
+
+        client.create_backup().unwrap();
+
+        let backup_path = config_path.with_extension("json.backup");
+        assert!(backup_path.exists());
+
+        let backup_content = fs::read_to_string(&backup_path).unwrap();
+        assert_eq!(backup_content, "original content");
+    }
+
+    #[test]
+    fn test_validate_config_empty_command() {
+        let config = ServerConfig {
+            command: String::new(),
+            args: vec![],
+            env: HashMap::new(),
+        };
+
+        let result = ClaudeDesktopClient::validate_config(&config);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("empty"));
+    }
+
+    #[test]
+    fn test_validate_config_empty_env_key() {
+        let mut env = HashMap::new();
+        env.insert(String::new(), "value".to_string());
+
+        let config = ServerConfig {
+            command: "node".to_string(),
+            args: vec![],
+            env,
+        };
+
+        let result = ClaudeDesktopClient::validate_config(&config);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("empty"));
+    }
+
+    #[test]
+    fn test_validate_config_env_key_with_equals() {
+        let mut env = HashMap::new();
+        env.insert("KEY=VALUE".to_string(), "value".to_string());
+
+        let config = ServerConfig {
+            command: "node".to_string(),
+            args: vec![],
+            env,
+        };
+
+        let result = ClaudeDesktopClient::validate_config(&config);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("="));
+    }
+
+    #[test]
+    fn test_validate_config_valid() {
+        let mut env = HashMap::new();
+        env.insert("PATH".to_string(), "/usr/bin".to_string());
+        env.insert("NODE_ENV".to_string(), "production".to_string());
+
+        let config = ServerConfig {
+            command: "node".to_string(),
+            args: vec![
+                "server.js".to_string(),
+                "--port".to_string(),
+                "3000".to_string(),
+            ],
+            env,
+        };
+
+        assert!(ClaudeDesktopClient::validate_config(&config).is_ok());
+    }
+
+    #[test]
+    fn test_name() {
+        let client = ClaudeDesktopClient::new();
+        assert_eq!(client.name(), "Claude Desktop");
+    }
+
+    #[test]
+    fn test_config_path() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("config.json");
+
+        let client = ClaudeDesktopClient {
+            config_path: config_path.clone(),
+        };
+
+        assert_eq!(client.config_path(), config_path);
+    }
+
+    #[test]
+    fn test_is_installed_with_parent() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("Claude").join("config.json");
+
+        let client = ClaudeDesktopClient {
+            config_path: config_path.clone(),
+        };
+
+        assert!(!client.is_installed());
+
+        fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+        assert!(client.is_installed());
+    }
+
+    #[test]
+    fn test_is_installed_no_parent() {
+        let client = ClaudeDesktopClient {
+            config_path: PathBuf::from("config.json"),
+        };
+
+        assert!(!client.is_installed());
+    }
+
+    #[test]
+    fn test_add_server() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("config.json");
+
+        let client = ClaudeDesktopClient {
+            config_path: config_path.clone(),
+        };
+
+        let server_config = ServerConfig {
+            command: "python".to_string(),
+            args: vec!["-m".to_string(), "mcp_server".to_string()],
+            env: HashMap::from([("PYTHONPATH".to_string(), "/app".to_string())]),
+        };
+
+        client.add_server("test-server", server_config).unwrap();
+
+        let servers = client.list_servers().unwrap();
+        assert_eq!(servers.len(), 1);
+        assert!(servers.contains_key("test-server"));
+
+        let added = &servers["test-server"];
+        assert_eq!(added.command, "python");
+        assert_eq!(added.args, vec!["-m", "mcp_server"]);
+        assert_eq!(added.env.get("PYTHONPATH"), Some(&"/app".to_string()));
+    }
+
+    #[test]
+    fn test_list_servers_empty() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("config.json");
+
+        let client = ClaudeDesktopClient {
+            config_path: config_path.clone(),
+        };
+
+        let servers = client.list_servers().unwrap();
+        assert!(servers.is_empty());
+    }
+
+    #[test]
+    fn test_list_servers_multiple() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("config.json");
+
+        let json_content = r#"{
+            "mcpServers": {
+                "server1": {
+                    "command": "node",
+                    "args": ["server1.js"],
+                    "env": {}
+                },
+                "server2": {
+                    "command": "python",
+                    "args": ["server2.py"],
+                    "env": {"KEY": "value"}
+                }
+            }
+        }"#;
+
+        fs::write(&config_path, json_content).unwrap();
+
+        let client = ClaudeDesktopClient {
+            config_path: config_path.clone(),
+        };
+
+        let servers = client.list_servers().unwrap();
+        assert_eq!(servers.len(), 2);
+        assert!(servers.contains_key("server1"));
+        assert!(servers.contains_key("server2"));
+
+        assert_eq!(servers["server1"].command, "node");
+        assert_eq!(servers["server2"].command, "python");
+    }
+
+    #[test]
+    fn test_add_server_with_backup() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("config.json");
+
+        // Write initial config
+        fs::write(&config_path, r#"{"mcpServers": {}}"#).unwrap();
+
+        let client = ClaudeDesktopClient {
+            config_path: config_path.clone(),
+        };
+
+        let server_config = ServerConfig {
+            command: "node".to_string(),
+            args: vec![],
+            env: HashMap::new(),
+        };
+
+        client.add_server("new-server", server_config).unwrap();
+
+        // Check backup was created
+        let backup_path = config_path.with_extension("json.backup");
+        assert!(backup_path.exists());
+
+        // Check new server was added
+        let servers = client.list_servers().unwrap();
+        assert!(servers.contains_key("new-server"));
+    }
+}

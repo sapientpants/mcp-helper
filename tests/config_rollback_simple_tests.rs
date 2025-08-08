@@ -1,5 +1,6 @@
 mod common;
-use common::{create_isolated_config_manager, MockClient};
+use common::create_isolated_config_manager;
+use mcp_helper::test_utils::mocks::MockClientBuilder;
 
 use mcp_helper::client::{McpClient, ServerConfig};
 use serial_test::serial;
@@ -10,7 +11,7 @@ use std::collections::HashMap;
 fn test_simple_config_snapshot_creation() {
     let (manager, temp_dir) = create_isolated_config_manager();
 
-    let client = MockClient::new("test-client");
+    let client = MockClientBuilder::new("test-client").build();
 
     let config = ServerConfig {
         command: "node".to_string(),
@@ -43,7 +44,7 @@ fn test_simple_config_snapshot_creation() {
 fn test_simple_config_rollback() {
     let (manager, temp_dir) = create_isolated_config_manager();
 
-    let client = MockClient::new("rollback-client");
+    let client = MockClientBuilder::new("rollback-client").build();
 
     // Install initial configuration
     let initial_config = ServerConfig {
@@ -86,7 +87,7 @@ fn test_simple_config_rollback() {
 fn test_simple_config_history() {
     let (manager, temp_dir) = create_isolated_config_manager();
 
-    let client = MockClient::new("history-client");
+    let client = MockClientBuilder::new("history-client").build();
 
     // Get initial history count
     let initial_history = manager
@@ -196,7 +197,7 @@ fn test_simple_config_diff() {
 fn test_simple_latest_snapshot() {
     let (manager, temp_dir) = create_isolated_config_manager();
 
-    let client = MockClient::new("latest-client");
+    let client = MockClientBuilder::new("latest-client").build();
 
     // Apply a few configurations
     for i in 0..3 {

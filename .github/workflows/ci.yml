@@ -76,7 +76,10 @@ jobs:
       run: make build
 
     - name: Run tests
-      run: make test
+      run: make test-unit test-integration
+      
+    - name: Note about E2E tests
+      run: echo "ℹ️ E2E tests run in a separate workflow for better isolation and platform-specific testing"
 
   # Security audit and code coverage - runs after tests pass
   security-and-coverage:

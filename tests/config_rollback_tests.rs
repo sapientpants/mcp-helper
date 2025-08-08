@@ -1,5 +1,4 @@
-mod common;
-use common::MockClient;
+use mcp_helper::test_utils::mocks::MockClientBuilder;
 
 use mcp_helper::client::{McpClient, ServerConfig};
 use mcp_helper::config::ConfigManager;
@@ -17,7 +16,7 @@ fn test_config_snapshot_creation() {
 
     let manager = ConfigManager::new().unwrap();
 
-    let client = MockClient::new("test-client");
+    let client = MockClientBuilder::new("test-client").build();
 
     let config = ServerConfig {
         command: "node".to_string(),
@@ -52,7 +51,7 @@ fn test_config_rollback_with_previous_config() {
 
     let manager = ConfigManager::new().unwrap();
 
-    let client = MockClient::new("rollback-client");
+    let client = MockClientBuilder::new("rollback-client").build();
 
     // Install initial configuration
     let initial_config = ServerConfig {
@@ -97,7 +96,7 @@ fn test_config_rollback_without_previous_config() {
 
     let manager = ConfigManager::new().unwrap();
 
-    let client = MockClient::new("no-previous-client");
+    let client = MockClientBuilder::new("no-previous-client").build();
 
     let config = ServerConfig {
         command: "deno".to_string(),
@@ -129,7 +128,7 @@ fn test_config_history_tracking() {
 
     let manager = ConfigManager::new().unwrap();
 
-    let client = MockClient::new("history-client");
+    let client = MockClientBuilder::new("history-client").build();
 
     // Apply multiple configurations
     for i in 0..3 {
@@ -222,7 +221,7 @@ fn test_config_history_cleanup() {
 
     let manager = ConfigManager::new().unwrap();
 
-    let client = MockClient::new("cleanup-client");
+    let client = MockClientBuilder::new("cleanup-client").build();
 
     // Apply more configurations than the max history limit (default is 10)
     for i in 0..15 {
@@ -263,7 +262,7 @@ fn test_latest_snapshot_retrieval() {
 
     let manager = ConfigManager::new().unwrap();
 
-    let client = MockClient::new("latest-client");
+    let client = MockClientBuilder::new("latest-client").build();
 
     // Apply a few configurations
     for i in 0..3 {

@@ -1,11 +1,11 @@
 #![allow(dead_code)]
 
-use mcp_helper::client::{McpClient, ServerConfig};
+use mcp_helper::client::ServerConfig;
+use mcp_helper::test_utils::mocks::MockClientBuilder;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::path::Path;
 use tempfile::TempDir;
 
 /// Creates a temporary directory with a config file
@@ -57,54 +57,21 @@ pub fn create_config_with_servers(servers: serde_json::Map<String, Value>) -> Va
     })
 }
 
-/// Mock client for testing
-pub struct MockClient {
-    pub name: String,
-    pub servers: Arc<Mutex<HashMap<String, ServerConfig>>>,
+/// Create a new mock client with the given name (using centralized mock builder)
+pub fn create_mock_client(name: impl Into<String>) -> mcp_helper::test_utils::mocks::MockClient {
+    MockClientBuilder::new(name).build()
 }
 
-impl MockClient {
-    /// Create a new mock client with the given name
-    pub fn new(name: impl Into<String>) -> Self {
-        Self {
-            name: name.into(),
-            servers: Arc::new(Mutex::new(HashMap::new())),
-        }
+/// Create a mock client with pre-populated servers (using centralized mock builder)
+pub fn create_mock_client_with_servers(
+    name: impl Into<String>,
+    servers: HashMap<String, ServerConfig>,
+) -> mcp_helper::test_utils::mocks::MockClient {
+    let mut builder = MockClientBuilder::new(name);
+    for (server_name, config) in servers {
+        builder = builder.with_server(server_name, config);
     }
-
-    /// Create a new mock client with pre-populated servers
-    pub fn with_servers(name: impl Into<String>, servers: HashMap<String, ServerConfig>) -> Self {
-        Self {
-            name: name.into(),
-            servers: Arc::new(Mutex::new(servers)),
-        }
-    }
-}
-
-impl McpClient for MockClient {
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    fn config_path(&self) -> PathBuf {
-        PathBuf::from("/mock/config.json")
-    }
-
-    fn is_installed(&self) -> bool {
-        true
-    }
-
-    fn add_server(&self, name: &str, config: ServerConfig) -> anyhow::Result<()> {
-        self.servers
-            .lock()
-            .unwrap()
-            .insert(name.to_string(), config);
-        Ok(())
-    }
-
-    fn list_servers(&self) -> anyhow::Result<HashMap<String, ServerConfig>> {
-        Ok(self.servers.lock().unwrap().clone())
-    }
+    builder.build()
 }
 
 /// Create an isolated configuration manager for testing

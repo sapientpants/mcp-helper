@@ -1070,3 +1070,671 @@ impl InstallCommand {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::deps::DependencyChecker;
+    use std::collections::HashMap;
+    use tempfile::TempDir;
+
+    // Mock dependency checker for testing
+    struct MockDependencyChecker {
+        dependency: Dependency,
+    }
+
+    impl DependencyChecker for MockDependencyChecker {
+        fn check(&self) -> anyhow::Result<crate::deps::DependencyCheck> {
+            Ok(crate::deps::DependencyCheck {
+                dependency: self.dependency.clone(),
+                status: DependencyStatus::Installed {
+                    version: Some("1.0.0".to_string()),
+                },
+                install_instructions: None,
+            })
+        }
+    }
+
+    // Mock server for testing
+    struct MockServer {
+        metadata: ServerMetadata,
+        dependency: Dependency,
+    }
+
+    impl McpServer for MockServer {
+        fn metadata(&self) -> &ServerMetadata {
+            &self.metadata
+        }
+
+        fn dependency(&self) -> Box<dyn DependencyChecker> {
+            Box::new(MockDependencyChecker {
+                dependency: self.dependency.clone(),
+            })
+        }
+
+        fn validate_config(&self, _config: &HashMap<String, String>) -> anyhow::Result<()> {
+            Ok(())
+        }
+
+        fn generate_command(&self) -> anyhow::Result<(String, Vec<String>)> {
+            Ok(("node".to_string(), vec!["server.js".to_string()]))
+        }
+    }
+
+    #[test]
+    fn test_install_command_new() {
+        let installer = InstallCommand::new(true);
+        assert!(installer.verbose);
+        assert!(!installer.auto_install_deps);
+        assert!(!installer.dry_run);
+        assert!(installer.config_overrides.is_empty());
+    }
+
+    #[test]
+    fn test_install_command_new_no_verbose() {
+        let installer = InstallCommand::new(false);
+        assert!(!installer.verbose);
+    }
+
+    #[test]
+    fn test_with_auto_install_deps() {
+        let installer = InstallCommand::new(false).with_auto_install_deps(true);
+        assert!(installer.auto_install_deps);
+
+        let installer = InstallCommand::new(false).with_auto_install_deps(false);
+        assert!(!installer.auto_install_deps);
+    }
+
+    #[test]
+    fn test_with_dry_run() {
+        let installer = InstallCommand::new(false).with_dry_run(true);
+        assert!(installer.dry_run);
+
+        let installer = InstallCommand::new(false).with_dry_run(false);
+        assert!(!installer.dry_run);
+    }
+
+    #[test]
+    fn test_with_config_overrides() {
+        let config_args = vec!["key1=value1".to_string(), "key2=value2".to_string()];
+
+        let installer = InstallCommand::new(false).with_config_overrides(config_args);
+
+        assert_eq!(installer.config_overrides.len(), 2);
+        assert_eq!(
+            installer.config_overrides.get("key1"),
+            Some(&"value1".to_string())
+        );
+        assert_eq!(
+            installer.config_overrides.get("key2"),
+            Some(&"value2".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_config_args() {
+        let args = vec![
+            "path=/home/user".to_string(),
+            "port=8080".to_string(),
+            "invalid_arg".to_string(),
+            "key=".to_string(),
+            "=value".to_string(),
+        ];
+
+        let config = InstallCommand::parse_config_args(&args);
+
+        // "invalid_arg" is skipped, "key=" creates key with empty value, "=value" creates empty key with value
+        assert_eq!(config.len(), 4);
+        assert_eq!(config.get("path"), Some(&"/home/user".to_string()));
+        assert_eq!(config.get("port"), Some(&"8080".to_string()));
+        assert_eq!(config.get("key"), Some(&"".to_string()));
+        assert_eq!(config.get(""), Some(&"value".to_string()));
+    }
+
+    #[test]
+    fn test_get_dependency_name() {
+        assert_eq!(
+            InstallCommand::get_dependency_name(&Dependency::NodeJs { min_version: None }),
+            "Node.js"
+        );
+        assert_eq!(
+            InstallCommand::get_dependency_name(&Dependency::Python { min_version: None }),
+            "Python"
+        );
+        assert_eq!(
+            InstallCommand::get_dependency_name(&Dependency::Docker {
+                min_version: None,
+                requires_compose: false
+            }),
+            "Docker"
+        );
+        assert_eq!(InstallCommand::get_dependency_name(&Dependency::Git), "Git");
+    }
+
+    #[test]
+    fn test_handle_installed_dependency() {
+        let result =
+            InstallCommand::handle_installed_dependency("Node.js", &Some("18.0.0".to_string()));
+        assert!(result.is_ok());
+
+        let result = InstallCommand::handle_installed_dependency("Python", &None);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_handle_missing_dependency() {
+        let check = crate::deps::DependencyCheck {
+            dependency: Dependency::NodeJs {
+                min_version: Some("18.0.0".to_string()),
+            },
+            status: DependencyStatus::Missing,
+            install_instructions: Some(crate::deps::InstallInstructions::default()),
+        };
+
+        let result = InstallCommand::handle_missing_dependency("Node.js", &check);
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            McpError::MissingDependency { dependency, .. } => {
+                assert_eq!(dependency, "Node.js");
+            }
+            _ => panic!("Expected MissingDependency error"),
+        }
+    }
+
+    #[test]
+    fn test_handle_missing_dependency_no_instructions() {
+        let check = crate::deps::DependencyCheck {
+            dependency: Dependency::Git,
+            status: DependencyStatus::Missing,
+            install_instructions: None,
+        };
+
+        let result = InstallCommand::handle_missing_dependency("Git", &check);
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            McpError::Other(err) => {
+                assert!(err.to_string().contains("Git is not installed"));
+            }
+            _ => panic!("Expected Other error"),
+        }
+    }
+
+    #[test]
+    fn test_build_field_prompt() {
+        let field = ConfigField {
+            name: "apiKey".to_string(),
+            field_type: ConfigFieldType::String,
+            description: Some("API key for authentication".to_string()),
+            default: None,
+        };
+
+        let prompt = InstallCommand::build_field_prompt(&field, true);
+        assert_eq!(prompt, "API key for authentication");
+
+        let prompt = InstallCommand::build_field_prompt(&field, false);
+        assert_eq!(prompt, "API key for authentication (optional)");
+    }
+
+    #[test]
+    fn test_build_field_prompt_no_description() {
+        let field = ConfigField {
+            name: "port".to_string(),
+            field_type: ConfigFieldType::Number,
+            description: None,
+            default: None,
+        };
+
+        let prompt = InstallCommand::build_field_prompt(&field, true);
+        assert_eq!(prompt, "port");
+
+        let prompt = InstallCommand::build_field_prompt(&field, false);
+        assert_eq!(prompt, "port (optional)");
+    }
+
+    #[test]
+    fn test_parse_batch_file() {
+        let content = r#"
+# Comment line
+[server1]
+key1=value1
+key2=value2
+
+[server2]
+port=8080
+
+# Another comment
+[server3]
+"#;
+
+        let result = InstallCommand::parse_batch_file(content);
+        assert!(result.is_ok());
+
+        let servers = result.unwrap();
+        assert_eq!(servers.len(), 3);
+
+        let server1_config = &servers["server1"];
+        assert_eq!(server1_config.get("key1"), Some(&"value1".to_string()));
+        assert_eq!(server1_config.get("key2"), Some(&"value2".to_string()));
+
+        let server2_config = &servers["server2"];
+        assert_eq!(server2_config.get("port"), Some(&"8080".to_string()));
+
+        let server3_config = &servers["server3"];
+        assert!(server3_config.is_empty());
+    }
+
+    #[test]
+    fn test_parse_batch_file_invalid() {
+        let content = "invalid line without equals";
+        let result = InstallCommand::parse_batch_file(content);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_github_url() {
+        let installer = InstallCommand::new(false);
+
+        assert_eq!(
+            installer.build_github_url("user/repo"),
+            "https://github.com/user/repo"
+        );
+
+        assert_eq!(
+            installer.build_github_url("github.com/user/repo"),
+            "https://github.com/user/repo"
+        );
+    }
+
+    #[test]
+    fn test_create_server_npm() {
+        let installer = InstallCommand::new(false);
+        let server_type = ServerType::Npm {
+            package: "@test/package".to_string(),
+            version: Some("1.0.0".to_string()),
+        };
+
+        let result = installer.create_server(&server_type);
+        assert!(result.is_ok());
+
+        let server = result.unwrap();
+        assert_eq!(server.metadata().name, "@test/package");
+    }
+
+    #[test]
+    fn test_create_server_binary() {
+        let installer = InstallCommand::new(false);
+        let server_type = ServerType::Binary {
+            url: "https://example.com/binary".to_string(),
+            checksum: None,
+        };
+
+        let result = installer.create_server(&server_type);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_create_server_python() {
+        let installer = InstallCommand::new(false);
+        let server_type = ServerType::Python {
+            package: "mcp-server".to_string(),
+            version: Some("1.0.0".to_string()),
+        };
+
+        let result = installer.create_server(&server_type);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_create_server_docker() {
+        let installer = InstallCommand::new(false);
+        let server_type = ServerType::Docker {
+            image: "mcp/server".to_string(),
+            tag: Some("latest".to_string()),
+        };
+
+        let result = installer.create_server(&server_type);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_initialize_config() {
+        let mut installer = InstallCommand::new(false);
+        installer
+            .config_overrides
+            .insert("key".to_string(), "value".to_string());
+
+        let config = installer.initialize_config();
+        assert_eq!(config.get("key"), Some(&"value".to_string()));
+    }
+
+    #[test]
+    fn test_collect_all_fields() {
+        let installer = InstallCommand::new(false);
+        let metadata = ServerMetadata {
+            name: "test-server".to_string(),
+            description: Some("Test server".to_string()),
+            server_type: ServerType::Npm {
+                package: "test-server".to_string(),
+                version: None,
+            },
+            required_config: vec![ConfigField {
+                name: "required".to_string(),
+                field_type: ConfigFieldType::String,
+                description: None,
+                default: None,
+            }],
+            optional_config: vec![ConfigField {
+                name: "optional".to_string(),
+                field_type: ConfigFieldType::Number,
+                description: None,
+                default: None,
+            }],
+        };
+
+        let fields = installer.collect_all_fields(&metadata);
+        assert_eq!(fields.len(), 2);
+        assert_eq!(fields[0].name, "required");
+        assert_eq!(fields[1].name, "optional");
+    }
+
+    #[test]
+    fn test_handle_no_config_required() {
+        let installer = InstallCommand::new(false);
+        let result = installer.handle_no_config_required();
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_handle_no_config_required_with_overrides() {
+        let mut installer = InstallCommand::new(false);
+        installer
+            .config_overrides
+            .insert("key".to_string(), "value".to_string());
+
+        let result = installer.handle_no_config_required();
+        assert!(result.is_ok());
+
+        let config = result.unwrap();
+        assert_eq!(config.get("key"), Some(&"value".to_string()));
+    }
+
+    #[test]
+    fn test_should_skip_field() {
+        let installer = InstallCommand::new(false);
+        let mut config = HashMap::new();
+        config.insert("existing".to_string(), "value".to_string());
+
+        let field = ConfigField {
+            name: "existing".to_string(),
+            field_type: ConfigFieldType::String,
+            description: None,
+            default: None,
+        };
+
+        let result = installer.should_skip_field(&config, &field);
+        assert!(result.is_ok());
+        assert!(result.unwrap());
+
+        let field2 = ConfigField {
+            name: "new".to_string(),
+            field_type: ConfigFieldType::String,
+            description: None,
+            default: None,
+        };
+
+        let result = installer.should_skip_field(&config, &field2);
+        assert!(result.is_ok());
+        assert!(!result.unwrap());
+    }
+
+    #[test]
+    fn test_is_required_field() {
+        let installer = InstallCommand::new(false);
+        let field1 = ConfigField {
+            name: "required".to_string(),
+            field_type: ConfigFieldType::String,
+            description: None,
+            default: None,
+        };
+        let field2 = ConfigField {
+            name: "optional".to_string(),
+            field_type: ConfigFieldType::String,
+            description: None,
+            default: None,
+        };
+
+        let metadata = ServerMetadata {
+            name: "test".to_string(),
+            description: Some("Test".to_string()),
+            server_type: ServerType::Npm {
+                package: "test".to_string(),
+                version: None,
+            },
+            required_config: vec![field1.clone()],
+            optional_config: vec![field2.clone()],
+        };
+
+        assert!(installer.is_required_field(&field1, &metadata));
+        assert!(!installer.is_required_field(&field2, &metadata));
+    }
+
+    #[test]
+    fn test_handle_non_interactive_field_required() {
+        let installer = InstallCommand::new(false);
+        let field = ConfigField {
+            name: "apiKey".to_string(),
+            field_type: ConfigFieldType::String,
+            description: None,
+            default: None,
+        };
+
+        let result = installer.handle_non_interactive_field(&field, true);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_handle_non_interactive_field_optional() {
+        let installer = InstallCommand::new(false);
+        let field = ConfigField {
+            name: "port".to_string(),
+            field_type: ConfigFieldType::Number,
+            description: None,
+            default: None,
+        };
+
+        let result = installer.handle_non_interactive_field(&field, false);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_ensure_clients_loaded() {
+        let mut installer = InstallCommand::new(false);
+        assert!(installer.client_registry.clients.is_empty());
+
+        installer.ensure_clients_loaded();
+        // The registry might still be empty if no clients are installed,
+        // but the method should not panic
+    }
+
+    #[test]
+    fn test_display_security_warnings() {
+        let installer = InstallCommand::new(false);
+        let warnings = vec!["Warning 1".to_string(), "Warning 2".to_string()];
+
+        // This should not panic
+        installer.display_security_warnings(&warnings);
+    }
+
+    #[test]
+    fn test_log_security_validation() {
+        let installer = InstallCommand::new(false);
+        let validation = SecurityValidation {
+            url: "https://github.com/test/repo".to_string(),
+            is_trusted: true,
+            is_https: true,
+            domain: Some("github.com".to_string()),
+            warnings: vec![],
+        };
+
+        // This should not panic
+        installer.log_security_validation("test-server", &validation);
+    }
+
+    #[test]
+    fn test_prompt_number_field_invalid() {
+        // Create a temporary input file to simulate user input
+        let temp_dir = TempDir::new().unwrap();
+        let input_file = temp_dir.path().join("input.txt");
+        std::fs::write(&input_file, "not_a_number\n").unwrap();
+
+        let _installer = InstallCommand::new(false);
+        let _field = ConfigField {
+            name: "port".to_string(),
+            field_type: ConfigFieldType::Number,
+            description: None,
+            default: None,
+        };
+
+        // This would normally prompt for input, but we can't easily test interactive input
+        // Just ensure the method exists and has the right signature
+        let _method = InstallCommand::prompt_number_field;
+    }
+
+    #[test]
+    fn test_prompt_boolean_field() {
+        let _installer = InstallCommand::new(false);
+        let _field = ConfigField {
+            name: "enabled".to_string(),
+            field_type: ConfigFieldType::Boolean,
+            description: None,
+            default: Some("true".to_string()),
+        };
+
+        // This would normally prompt for input
+        // Just ensure the method exists and has the right signature
+        let _method = InstallCommand::prompt_boolean_field;
+    }
+
+    #[test]
+    fn test_validate_final_config() {
+        let installer = InstallCommand::new(false);
+        let server = MockServer {
+            metadata: ServerMetadata {
+                name: "test".to_string(),
+                description: Some("Test".to_string()),
+                server_type: ServerType::Npm {
+                    package: "test".to_string(),
+                    version: None,
+                },
+                required_config: vec![],
+                optional_config: vec![],
+            },
+            dependency: Dependency::NodeJs { min_version: None },
+        };
+
+        let config = HashMap::new();
+        let result = installer.validate_final_config(&server, &config);
+        // The result depends on the ConfigManager implementation
+        // Just ensure it doesn't panic
+        let _ = result;
+    }
+
+    #[test]
+    fn test_prompt_string_field() {
+        let _installer = InstallCommand::new(false);
+        let _field = ConfigField {
+            name: "path".to_string(),
+            field_type: ConfigFieldType::Path,
+            description: None,
+            default: Some("/default/path".to_string()),
+        };
+
+        // Test that the method exists and has the right signature
+        let _method = InstallCommand::prompt_string_field;
+    }
+
+    #[test]
+    fn test_display_config_mode() {
+        let installer = InstallCommand::new(true);
+        installer.display_config_mode(true);
+        installer.display_config_mode(false);
+
+        let installer_quiet = InstallCommand::new(false);
+        installer_quiet.display_config_mode(true);
+        installer_quiet.display_config_mode(false);
+    }
+
+    #[test]
+    fn test_process_config_field() {
+        let installer = InstallCommand::new(false);
+        let mut config = HashMap::new();
+        let field = ConfigField {
+            name: "test".to_string(),
+            field_type: ConfigFieldType::String,
+            description: None,
+            default: None,
+        };
+        let metadata = ServerMetadata {
+            name: "test-server".to_string(),
+            description: Some("Test".to_string()),
+            server_type: ServerType::Npm {
+                package: "test-server".to_string(),
+                version: None,
+            },
+            required_config: vec![],
+            optional_config: vec![field.clone()],
+        };
+
+        // With override already in config
+        config.insert("test".to_string(), "override".to_string());
+        let result = installer.process_config_field(&mut config, &field, &metadata, true);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_prompt_for_field_value() {
+        let _installer = InstallCommand::new(false);
+
+        // Test different field types
+        let _string_field = ConfigField {
+            name: "string".to_string(),
+            field_type: ConfigFieldType::String,
+            description: None,
+            default: None,
+        };
+
+        let _path_field = ConfigField {
+            name: "path".to_string(),
+            field_type: ConfigFieldType::Path,
+            description: None,
+            default: None,
+        };
+
+        let _url_field = ConfigField {
+            name: "url".to_string(),
+            field_type: ConfigFieldType::Url,
+            description: None,
+            default: None,
+        };
+
+        let _number_field = ConfigField {
+            name: "number".to_string(),
+            field_type: ConfigFieldType::Number,
+            description: None,
+            default: None,
+        };
+
+        let _bool_field = ConfigField {
+            name: "bool".to_string(),
+            field_type: ConfigFieldType::Boolean,
+            description: None,
+            default: None,
+        };
+
+        // Just ensure the method handles all field types
+        let _method = InstallCommand::prompt_for_field_value;
+    }
+}

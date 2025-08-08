@@ -1,108 +1,11 @@
 use mcp_helper::client::{McpClient, ServerConfig};
-use mcp_helper::deps::{Dependency, DependencyCheck, DependencyChecker, DependencyStatus};
+use mcp_helper::deps::DependencyStatus;
 use mcp_helper::install::InstallCommand;
 use mcp_helper::server::{
-    detect_server_type, ConfigField, ConfigFieldType, McpServer, ServerMetadata, ServerType,
+    detect_server_type, ConfigField, ConfigFieldType, ServerMetadata, ServerType,
 };
+use mcp_helper::test_utils::mocks::MockClientBuilder;
 use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::sync::Mutex;
-
-// Mock client for testing
-#[derive(Clone)]
-struct MockClient {
-    name: String,
-    installed: bool,
-    servers: Arc<Mutex<HashMap<String, ServerConfig>>>,
-}
-
-impl MockClient {
-    fn new(name: &str, installed: bool) -> Self {
-        Self {
-            name: name.to_string(),
-            installed,
-            servers: Arc::new(Mutex::new(HashMap::new())),
-        }
-    }
-}
-
-impl McpClient for MockClient {
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    fn config_path(&self) -> PathBuf {
-        PathBuf::from(format!("/mock/{}/config.json", self.name))
-    }
-
-    fn is_installed(&self) -> bool {
-        self.installed
-    }
-
-    fn add_server(&self, name: &str, config: ServerConfig) -> anyhow::Result<()> {
-        self.servers
-            .lock()
-            .unwrap()
-            .insert(name.to_string(), config);
-        Ok(())
-    }
-
-    fn list_servers(&self) -> anyhow::Result<HashMap<String, ServerConfig>> {
-        Ok(self.servers.lock().unwrap().clone())
-    }
-}
-
-// Mock server for testing
-#[allow(dead_code)]
-struct MockServer {
-    metadata: ServerMetadata,
-    dependency_satisfied: bool,
-}
-
-impl McpServer for MockServer {
-    fn metadata(&self) -> &ServerMetadata {
-        &self.metadata
-    }
-
-    fn validate_config(&self, _config: &HashMap<String, String>) -> anyhow::Result<()> {
-        Ok(())
-    }
-
-    fn generate_command(&self) -> anyhow::Result<(String, Vec<String>)> {
-        Ok(("mock".to_string(), vec!["--stdio".to_string()]))
-    }
-
-    fn dependency(&self) -> Box<dyn DependencyChecker> {
-        Box::new(MockDependencyChecker {
-            satisfied: self.dependency_satisfied,
-        })
-    }
-}
-
-// Mock dependency checker
-#[allow(dead_code)]
-struct MockDependencyChecker {
-    satisfied: bool,
-}
-
-impl DependencyChecker for MockDependencyChecker {
-    fn check(&self) -> anyhow::Result<DependencyCheck> {
-        Ok(DependencyCheck {
-            dependency: Dependency::NodeJs {
-                min_version: Some("16.0.0".to_string()),
-            },
-            status: if self.satisfied {
-                DependencyStatus::Installed {
-                    version: Some("18.0.0".to_string()),
-                }
-            } else {
-                DependencyStatus::Missing
-            },
-            install_instructions: None,
-        })
-    }
-}
 
 #[test]
 fn test_install_command_creation() {
@@ -250,14 +153,15 @@ fn test_config_field_types() {
 
 #[test]
 fn test_mock_client_add_server() {
-    let client = MockClient::new("test-client", true);
     let config = ServerConfig {
         command: "npx".to_string(),
         args: vec!["test-server".to_string()],
         env: HashMap::new(),
     };
 
-    client.add_server("test-server", config.clone()).unwrap();
+    let client = MockClientBuilder::new("test-client")
+        .with_server("test-server", config.clone())
+        .build();
 
     let servers = client.list_servers().unwrap();
     assert_eq!(servers.len(), 1);

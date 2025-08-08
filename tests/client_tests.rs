@@ -1,44 +1,7 @@
 use mcp_helper::client::{ClientRegistry, McpClient, ServerConfig};
+use mcp_helper::test_utils::mocks::MockClientBuilder;
 use std::collections::HashMap;
 use std::path::PathBuf;
-
-#[derive(Clone)]
-struct MockClient {
-    name: String,
-    installed: bool,
-    config_path: PathBuf,
-}
-
-impl McpClient for MockClient {
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    fn config_path(&self) -> PathBuf {
-        self.config_path.clone()
-    }
-
-    fn is_installed(&self) -> bool {
-        self.installed
-    }
-
-    fn add_server(&self, _name: &str, _config: ServerConfig) -> anyhow::Result<()> {
-        Ok(())
-    }
-
-    fn list_servers(&self) -> anyhow::Result<HashMap<String, ServerConfig>> {
-        let mut servers = HashMap::new();
-        servers.insert(
-            "test-server".to_string(),
-            ServerConfig {
-                command: "test".to_string(),
-                args: vec!["arg1".to_string()],
-                env: HashMap::new(),
-            },
-        );
-        Ok(servers)
-    }
-}
 
 #[test]
 fn test_server_config_creation() {
@@ -65,11 +28,11 @@ fn test_client_registry_new() {
 #[test]
 fn test_client_registry_register() {
     let mut registry = ClientRegistry::new();
-    let client = Box::new(MockClient {
-        name: "test".to_string(),
-        installed: true,
-        config_path: PathBuf::from("/test/path"),
-    });
+    let client = Box::new(
+        MockClientBuilder::new("test")
+            .with_config_path("/test/path")
+            .build(),
+    );
 
     registry.register(client);
     assert_eq!(registry.clients.len(), 1);
@@ -79,17 +42,18 @@ fn test_client_registry_register() {
 fn test_client_registry_detect_installed() {
     let mut registry = ClientRegistry::new();
 
-    registry.register(Box::new(MockClient {
-        name: "installed".to_string(),
-        installed: true,
-        config_path: PathBuf::from("/installed"),
-    }));
+    registry.register(Box::new(
+        MockClientBuilder::new("installed")
+            .with_config_path("/installed")
+            .build(),
+    ));
 
-    registry.register(Box::new(MockClient {
-        name: "not_installed".to_string(),
-        installed: false,
-        config_path: PathBuf::from("/not_installed"),
-    }));
+    registry.register(Box::new(
+        MockClientBuilder::new("not_installed")
+            .with_config_path("/not_installed")
+            .not_installed()
+            .build(),
+    ));
 
     let installed = registry.detect_installed();
     assert_eq!(installed.len(), 1);
@@ -100,11 +64,11 @@ fn test_client_registry_detect_installed() {
 fn test_client_registry_get_by_name() {
     let mut registry = ClientRegistry::new();
 
-    registry.register(Box::new(MockClient {
-        name: "Claude".to_string(),
-        installed: true,
-        config_path: PathBuf::from("/claude"),
-    }));
+    registry.register(Box::new(
+        MockClientBuilder::new("Claude")
+            .with_config_path("/claude")
+            .build(),
+    ));
 
     assert!(registry.get_by_name("Claude").is_some());
     assert!(registry.get_by_name("claude").is_some()); // Case insensitive
@@ -120,21 +84,21 @@ fn test_client_registry_default() {
 
 #[test]
 fn test_mock_client_trait_methods() {
-    let client = MockClient {
-        name: "test".to_string(),
-        installed: true,
-        config_path: PathBuf::from("/test"),
-    };
-
-    assert_eq!(client.name(), "test");
-    assert_eq!(client.config_path(), PathBuf::from("/test"));
-    assert!(client.is_installed());
-
     let config = ServerConfig {
         command: "cmd".to_string(),
         args: vec![],
         env: HashMap::new(),
     };
+
+    let client = MockClientBuilder::new("test")
+        .with_config_path("/test")
+        .with_server("test-server", config.clone())
+        .build();
+
+    assert_eq!(client.name(), "test");
+    assert_eq!(client.config_path(), PathBuf::from("/test"));
+    assert!(client.is_installed());
+
     assert!(client.add_server("server", config).is_ok());
 
     let servers = client.list_servers().unwrap();

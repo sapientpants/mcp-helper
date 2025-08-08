@@ -2,6 +2,7 @@ use mcp_helper::server::{
     detect_server_type, parse_npm_package, ConfigField, ConfigFieldType, McpServer, ServerMetadata,
     ServerType,
 };
+use mcp_helper::test_utils::mocks::MockServerBuilder;
 use std::collections::HashMap;
 
 #[test]
@@ -211,72 +212,22 @@ fn test_config_field_defaults() {
     assert_eq!(field.default, Some("default_value".to_string()));
 }
 
-// Mock implementation for testing the trait
-struct MockServer {
-    metadata: ServerMetadata,
-}
-
-impl McpServer for MockServer {
-    fn metadata(&self) -> &ServerMetadata {
-        &self.metadata
-    }
-
-    fn validate_config(&self, config: &HashMap<String, String>) -> anyhow::Result<()> {
-        for field in &self.metadata.required_config {
-            if !config.contains_key(&field.name) {
-                anyhow::bail!("Missing required field: {}", field.name);
-            }
-        }
-        Ok(())
-    }
-
-    fn generate_command(&self) -> anyhow::Result<(String, Vec<String>)> {
-        match &self.metadata.server_type {
-            ServerType::Npm { package, .. } => Ok(("npx".to_string(), vec![package.clone()])),
-            _ => Ok(("echo".to_string(), vec!["test".to_string()])),
-        }
-    }
-
-    fn dependency(&self) -> Box<dyn mcp_helper::deps::DependencyChecker> {
-        use mcp_helper::deps::{Dependency, DependencyCheck, DependencyChecker, DependencyStatus};
-
-        struct MockDependencyChecker;
-
-        impl DependencyChecker for MockDependencyChecker {
-            fn check(&self) -> anyhow::Result<DependencyCheck> {
-                Ok(DependencyCheck {
-                    dependency: Dependency::NodeJs { min_version: None },
-                    status: DependencyStatus::Installed {
-                        version: Some("18.0.0".to_string()),
-                    },
-                    install_instructions: None,
-                })
-            }
-        }
-
-        Box::new(MockDependencyChecker)
-    }
-}
+// Using centralized mock builder for testing
 
 #[test]
 fn test_mock_server_trait() {
-    let server = MockServer {
-        metadata: ServerMetadata {
-            name: "test".to_string(),
-            description: None,
-            server_type: ServerType::Npm {
-                package: "test-package".to_string(),
-                version: None,
-            },
-            required_config: vec![ConfigField {
-                name: "required".to_string(),
-                field_type: ConfigFieldType::String,
-                description: None,
-                default: None,
-            }],
-            optional_config: vec![],
-        },
-    };
+    let server = MockServerBuilder::new("test")
+        .with_type(ServerType::Npm {
+            package: "test-package".to_string(),
+            version: None,
+        })
+        .with_config_validator(|config| {
+            if !config.contains_key("required") {
+                anyhow::bail!("Missing required field: required");
+            }
+            Ok(())
+        })
+        .build();
 
     assert_eq!(server.metadata().name, "test");
 

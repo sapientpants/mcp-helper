@@ -28,3 +28,6 @@ tarpaulin-report.html
 
 # Log files
 logs/
+
+# Proptest regression files
+proptest-regressions/

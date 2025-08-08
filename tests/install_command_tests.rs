@@ -1,60 +1,12 @@
-use mcp_helper::client::{ClientRegistry, McpClient, ServerConfig};
+use mcp_helper::client::{ClientRegistry, ServerConfig};
 use mcp_helper::deps::{Dependency, DependencyCheck, DependencyStatus, InstallInstructions};
 use mcp_helper::error::McpError;
 use mcp_helper::install::InstallCommand;
 use mcp_helper::server::{ConfigField, ConfigFieldType};
+use mcp_helper::test_utils::mocks::MockClientBuilder;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 
-// Mock client for testing
-#[derive(Clone)]
-#[allow(dead_code)]
-struct MockClient {
-    name: String,
-    is_installed: bool,
-    servers: Arc<Mutex<HashMap<String, ServerConfig>>>,
-}
-
-impl MockClient {
-    fn new(name: &str, is_installed: bool) -> Self {
-        Self {
-            name: name.to_string(),
-            is_installed,
-            servers: Arc::new(Mutex::new(HashMap::new())),
-        }
-    }
-
-    #[allow(dead_code)]
-    fn get_servers(&self) -> HashMap<String, ServerConfig> {
-        self.servers.lock().unwrap().clone()
-    }
-}
-
-impl McpClient for MockClient {
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    fn is_installed(&self) -> bool {
-        self.is_installed
-    }
-
-    fn config_path(&self) -> std::path::PathBuf {
-        std::path::PathBuf::from(format!("/tmp/test_{}.json", self.name))
-    }
-
-    fn add_server(&self, name: &str, config: ServerConfig) -> anyhow::Result<()> {
-        self.servers
-            .lock()
-            .unwrap()
-            .insert(name.to_string(), config);
-        Ok(())
-    }
-
-    fn list_servers(&self) -> anyhow::Result<HashMap<String, ServerConfig>> {
-        Ok(self.servers.lock().unwrap().clone())
-    }
-}
+// Using centralized mock builders for testing
 
 #[test]
 fn test_install_command_new() {
@@ -275,9 +227,13 @@ mod integration_helpers {
 
     pub fn create_test_registry_with_clients() -> ClientRegistry {
         let mut registry = ClientRegistry::new();
-        registry.register(Box::new(MockClient::new("test-client-1", true)));
-        registry.register(Box::new(MockClient::new("test-client-2", true)));
-        registry.register(Box::new(MockClient::new("test-client-3", false))); // Not installed
+        registry.register(Box::new(MockClientBuilder::new("test-client-1").build()));
+        registry.register(Box::new(MockClientBuilder::new("test-client-2").build()));
+        registry.register(Box::new(
+            MockClientBuilder::new("test-client-3")
+                .not_installed()
+                .build(),
+        )); // Not installed
         registry
     }
 

@@ -51,7 +51,7 @@ pub struct InstallInstructions {
     pub linux: Vec<InstallMethod>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct InstallMethod {
     pub name: String,
     pub command: String,

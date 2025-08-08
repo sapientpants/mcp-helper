@@ -371,4 +371,221 @@ mod tests {
             _ => panic!("Expected Docker dependency with compose requirement"),
         }
     }
+
+    #[test]
+    fn test_parse_docker_compose_new_format() {
+        let checker = DockerChecker::new();
+
+        // Test valid new format
+        let version_line = "Docker Compose version v2.17.3";
+        let parsed = checker.parse_docker_compose_new_format(version_line);
+        assert_eq!(parsed, Some("2.17.3".to_string()));
+
+        // Test without prefix
+        let version_line = "Some other output";
+        let parsed = checker.parse_docker_compose_new_format(version_line);
+        assert_eq!(parsed, None);
+
+        // Test with extra whitespace
+        let version_line = "Docker Compose version v2.17.3  ";
+        let parsed = checker.parse_docker_compose_new_format(version_line);
+        assert_eq!(parsed, Some("2.17.3".to_string()));
+    }
+
+    #[test]
+    fn test_parse_docker_compose_legacy_format() {
+        let checker = DockerChecker::new();
+
+        // Test valid legacy format with build info
+        let version_line = "docker-compose version 1.29.2, build 5becea4c";
+        let parsed = checker.parse_docker_compose_legacy_format(version_line);
+        assert_eq!(parsed, Some("1.29.2".to_string()));
+
+        // Test valid legacy format without build info
+        let version_line = "docker-compose version 1.29.2";
+        let parsed = checker.parse_docker_compose_legacy_format(version_line);
+        assert_eq!(parsed, Some("1.29.2".to_string()));
+
+        // Test without prefix
+        let version_line = "Some other output";
+        let parsed = checker.parse_docker_compose_legacy_format(version_line);
+        assert_eq!(parsed, None);
+
+        // Test with extra whitespace
+        let version_line = "docker-compose version 1.29.2  ";
+        let parsed = checker.parse_docker_compose_legacy_format(version_line);
+        assert_eq!(parsed, Some("1.29.2".to_string()));
+    }
+
+    #[test]
+    fn test_determine_status_missing() {
+        let checker = DockerChecker::new();
+        let status = checker.determine_status(None).unwrap();
+
+        match status {
+            DependencyStatus::Missing => {}
+            _ => panic!("Expected Missing status"),
+        }
+    }
+
+    #[test]
+    fn test_check_compose_requirement_not_required() {
+        let checker = DockerChecker::new();
+        let status = checker.check_compose_requirement("24.0.0").unwrap();
+
+        match status {
+            DependencyStatus::Installed { version } => {
+                assert_eq!(version, Some("24.0.0".to_string()));
+            }
+            _ => panic!("Expected Installed status"),
+        }
+    }
+
+    #[test]
+    fn test_get_install_instructions_if_needed_missing() {
+        let checker = DockerChecker::new();
+        let status = DependencyStatus::Missing;
+        let instructions = checker.get_install_instructions_if_needed(&status);
+
+        assert!(instructions.is_some());
+    }
+
+    #[test]
+    fn test_get_install_instructions_if_needed_installed() {
+        let checker = DockerChecker::new();
+        let status = DependencyStatus::Installed {
+            version: Some("24.0.0".to_string()),
+        };
+        let instructions = checker.get_install_instructions_if_needed(&status);
+
+        assert!(instructions.is_none());
+    }
+
+    #[test]
+    fn test_get_install_instructions_if_needed_version_mismatch() {
+        let checker = DockerChecker::new();
+        let status = DependencyStatus::VersionMismatch {
+            installed: "20.0.0".to_string(),
+            required: "24.0.0".to_string(),
+        };
+        let instructions = checker.get_install_instructions_if_needed(&status);
+
+        assert!(instructions.is_some());
+    }
+
+    #[test]
+    fn test_get_install_instructions_if_needed_config_required() {
+        let checker = DockerChecker::new();
+        let status = DependencyStatus::ConfigurationRequired {
+            issue: "Not running".to_string(),
+            solution: "Start Docker".to_string(),
+        };
+        let instructions = checker.get_install_instructions_if_needed(&status);
+
+        assert!(instructions.is_none());
+    }
+
+    #[test]
+    fn test_docker_checker_chain_construction() {
+        // Test builder pattern chaining
+        let checker = DockerChecker::with_min_version("20.10.0").with_compose_check();
+
+        assert_eq!(checker.min_version, Some("20.10.0".to_string()));
+        assert!(checker.check_compose);
+    }
+
+    #[test]
+    fn test_check_docker_available_function() {
+        // This will run the actual check, but we can't assert the result
+        // since it depends on system state
+        let _ = check_docker_available();
+    }
+
+    #[test]
+    fn test_check_compose_available_function() {
+        // This will run the actual check, but we can't assert the result
+        // since it depends on system state
+        let _ = check_compose_available();
+    }
+
+    #[test]
+    fn test_check_installed_docker_mock_scenarios() {
+        // Test the structure of status returns
+        let _checker = DockerChecker::new();
+
+        // Test that we can create the expected status types
+        let not_running_status = DependencyStatus::ConfigurationRequired {
+            issue: "Docker is installed but not running".to_string(),
+            solution: "Start Docker Desktop or run 'sudo systemctl start docker'".to_string(),
+        };
+
+        match not_running_status {
+            DependencyStatus::ConfigurationRequired { issue, solution } => {
+                assert!(issue.contains("not running"));
+                assert!(solution.contains("Start Docker"));
+            }
+            _ => panic!("Expected ConfigurationRequired status"),
+        }
+    }
+
+    #[test]
+    fn test_docker_dependency_variants() {
+        // Test all possible Docker dependency configurations
+        let configs = vec![
+            (None, false),
+            (Some("20.10.0".to_string()), false),
+            (None, true),
+            (Some("20.10.0".to_string()), true),
+        ];
+
+        for (min_version, requires_compose) in configs {
+            let dependency = Dependency::Docker {
+                min_version: min_version.clone(),
+                requires_compose,
+            };
+
+            match dependency {
+                Dependency::Docker {
+                    min_version: mv,
+                    requires_compose: rc,
+                } => {
+                    assert_eq!(mv, min_version);
+                    assert_eq!(rc, requires_compose);
+                }
+                _ => panic!("Expected Docker dependency"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_version_parsing_edge_cases() {
+        let checker = DockerChecker::new();
+
+        // Test empty string
+        let parsed = checker.parse_docker_compose_new_format("");
+        assert_eq!(parsed, None);
+
+        let parsed = checker.parse_docker_compose_legacy_format("");
+        assert_eq!(parsed, None);
+
+        // Test version with special characters
+        let version_line = "docker-compose version 1.29.2-rc1, build 5becea4c";
+        let parsed = checker.parse_docker_compose_legacy_format(version_line);
+        assert_eq!(parsed, Some("1.29.2-rc1".to_string()));
+    }
+
+    #[test]
+    fn test_docker_checker_traits() {
+        // Test that DockerChecker implements expected traits
+        let checker = DockerChecker::new();
+
+        // Test Debug trait
+        let debug_str = format!("{checker:?}");
+        assert!(debug_str.contains("DockerChecker"));
+
+        // Test Default trait
+        let default_checker: DockerChecker = Default::default();
+        assert_eq!(default_checker.min_version, None);
+        assert!(!default_checker.check_compose);
+    }
 }

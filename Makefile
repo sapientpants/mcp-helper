@@ -22,9 +22,9 @@ else
 endif
 
 # Phony targets
-.PHONY: all help clean build build-release test test-all test-unit test-integration \
+.PHONY: all help clean build build-release test test-all test-unit test-integration test-e2e \
         run install fmt fmt-check lint lint-all check doc audit hooks dev ci quick-test \
-        bench coverage coverage-ci coverage-detailed test-property test-security \
+        bench bench-startup bench-performance coverage coverage-ci coverage-detailed test-property test-security \
         test-performance test-errors watch pre-push pre-commit
 
 # Help target
@@ -42,6 +42,7 @@ help:
 	@echo "  build-release  Build optimized release binary"
 	@echo "  test-unit      Run unit tests only"
 	@echo "  test-integration Run integration tests only"
+	@echo "  test-e2e       Run end-to-end tests"
 	@echo "  fmt            Format code using rustfmt"
 	@echo "  lint           Run clippy linter"
 	@echo "  check          Run cargo check"
@@ -57,6 +58,11 @@ help:
 	@echo "  test-property  Run property-based tests"
 	@echo "  test-performance Run performance tests"
 	@echo "  coverage-detailed Generate detailed coverage report"
+	@echo ""
+	@echo "Benchmark targets:"
+	@echo "  bench          Run all benchmarks"
+	@echo "  bench-startup  Run startup time benchmarks"
+	@echo "  bench-performance Run performance benchmarks"
 
 # Clean target - remove all build artifacts
 clean:
@@ -79,7 +85,7 @@ build-release:
 	@echo "✓ Release build complete: $(RELEASE_DIR)/$(BINARY_NAME)"
 
 # Test target - run all tests
-test: test-unit test-integration
+test: test-unit test-integration test-e2e
 	@echo "✓ All tests passed"
 
 # Test unit - run unit tests only
@@ -91,6 +97,19 @@ test-unit:
 test-integration:
 	@echo "Running integration tests..."
 	@$(CARGO) test --test '*' -- --test-threads=1
+
+# Test E2E - run end-to-end tests
+test-e2e:
+	@echo "Building binary for E2E tests..."
+	@$(CARGO) build --quiet
+	@echo "Running E2E tests..."
+	@$(CARGO) test --test 'e2e_*' -- --test-threads=1
+	@echo "✓ E2E tests passed"
+
+# Test E2E with specific scenario
+test-e2e-%:
+	@echo "Running E2E test: $*..."
+	@$(CARGO) test --test 'e2e_$*' -- --test-threads=1
 
 # Test all with verbose output
 test-all:
@@ -162,10 +181,19 @@ ci: clean fmt-check lint build audit coverage-ci
 quick-test:
 	@$(CARGO) test --lib -- --test-threads=1
 
-# Benchmark (requires nightly Rust)
-bench:
-	@echo "Running benchmarks..."
-	@$(CARGO) +nightly bench
+# Benchmark - run all benchmarks
+bench: build-release bench-startup bench-performance
+	@echo "✓ All benchmarks complete"
+
+# Benchmark - startup time only
+bench-startup:
+	@echo "Running startup time benchmarks..."
+	@$(CARGO) bench --bench startup_time
+
+# Benchmark - performance suite
+bench-performance:
+	@echo "Running performance benchmarks..."
+	@$(CARGO) bench --bench performance
 
 # Coverage report (requires cargo-tarpaulin)
 coverage:

@@ -1,0 +1,19 @@
+# Proptest configuration for MCP Helper
+
+# Number of test cases to generate per property test
+cases = 256
+
+# Maximum number of shrink iterations
+max_shrink_iters = 10000
+
+# Timeout for each test in milliseconds
+timeout = 5000
+
+# Enable verbose failures
+verbose = 1
+
+# RNG algorithm
+rng_algorithm = "ChaCha"
+
+# Failure persistence file location
+failure_persistence = "proptest-regressions"

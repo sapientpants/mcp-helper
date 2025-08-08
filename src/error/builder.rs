@@ -128,3 +128,317 @@ impl ConfigRequiredBuilder {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod unit {
+        use super::*;
+
+        mod missing_dependency_builder {
+            use super::*;
+
+            #[test]
+            fn basic() {
+                let error = ErrorBuilder::missing_dependency("nodejs").build();
+                match error {
+                    McpError::MissingDependency {
+                        dependency,
+                        required_version,
+                        install_instructions: _,
+                    } => {
+                        assert_eq!(dependency, "nodejs");
+                        assert_eq!(required_version, None);
+                    }
+                    _ => panic!("Unexpected error type"),
+                }
+            }
+
+            #[test]
+            fn with_version() {
+                let error = ErrorBuilder::missing_dependency("python")
+                    .version("3.8")
+                    .build();
+                match error {
+                    McpError::MissingDependency {
+                        dependency,
+                        required_version,
+                        install_instructions: _,
+                    } => {
+                        assert_eq!(dependency, "python");
+                        assert_eq!(required_version, Some("3.8".to_string()));
+                    }
+                    _ => panic!("Unexpected error type"),
+                }
+            }
+
+            #[test]
+            fn with_instructions() {
+                let instructions = InstallInstructions {
+                    windows: vec![crate::deps::InstallMethod {
+                        name: "winget".to_string(),
+                        command: "winget install Node.js".to_string(),
+                        description: None,
+                    }],
+                    macos: vec![crate::deps::InstallMethod {
+                        name: "brew".to_string(),
+                        command: "brew install node".to_string(),
+                        description: None,
+                    }],
+                    linux: vec![crate::deps::InstallMethod {
+                        name: "apt".to_string(),
+                        command: "sudo apt install nodejs".to_string(),
+                        description: None,
+                    }],
+                };
+                let error = ErrorBuilder::missing_dependency("nodejs")
+                    .version("18.0")
+                    .instructions(instructions.clone())
+                    .build();
+                match error {
+                    McpError::MissingDependency {
+                        dependency,
+                        required_version,
+                        install_instructions,
+                    } => {
+                        assert_eq!(dependency, "nodejs");
+                        assert_eq!(required_version, Some("18.0".to_string()));
+                        assert_eq!(
+                            install_instructions.windows.len(),
+                            instructions.windows.len()
+                        );
+                    }
+                    _ => panic!("Unexpected error type"),
+                }
+            }
+        }
+
+        mod version_mismatch_builder {
+            use super::*;
+
+            #[test]
+            fn basic() {
+                let error = ErrorBuilder::version_mismatch("git").build();
+                match error {
+                    McpError::VersionMismatch {
+                        dependency,
+                        current_version,
+                        required_version,
+                        upgrade_instructions: _,
+                    } => {
+                        assert_eq!(dependency, "git");
+                        assert_eq!(current_version, "");
+                        assert_eq!(required_version, "");
+                    }
+                    _ => panic!("Unexpected error type"),
+                }
+            }
+
+            #[test]
+            fn with_versions() {
+                let error = ErrorBuilder::version_mismatch("docker")
+                    .installed("20.10.0")
+                    .required("24.0.0")
+                    .build();
+                match error {
+                    McpError::VersionMismatch {
+                        dependency,
+                        current_version,
+                        required_version,
+                        upgrade_instructions: _,
+                    } => {
+                        assert_eq!(dependency, "docker");
+                        assert_eq!(current_version, "20.10.0");
+                        assert_eq!(required_version, "24.0.0");
+                    }
+                    _ => panic!("Unexpected error type"),
+                }
+            }
+
+            #[test]
+            fn with_instructions() {
+                let instructions = InstallInstructions {
+                    windows: vec![crate::deps::InstallMethod {
+                        name: "manual".to_string(),
+                        command: "Update Docker Desktop".to_string(),
+                        description: None,
+                    }],
+                    macos: vec![crate::deps::InstallMethod {
+                        name: "brew".to_string(),
+                        command: "brew upgrade docker".to_string(),
+                        description: None,
+                    }],
+                    linux: vec![crate::deps::InstallMethod {
+                        name: "apt".to_string(),
+                        command: "sudo apt update && sudo apt upgrade docker".to_string(),
+                        description: None,
+                    }],
+                };
+                let error = ErrorBuilder::version_mismatch("docker")
+                    .installed("20.10.0")
+                    .required("24.0.0")
+                    .instructions(instructions.clone())
+                    .build();
+                match error {
+                    McpError::VersionMismatch {
+                        dependency,
+                        current_version,
+                        required_version,
+                        upgrade_instructions,
+                    } => {
+                        assert_eq!(dependency, "docker");
+                        assert_eq!(current_version, "20.10.0");
+                        assert_eq!(required_version, "24.0.0");
+                        assert_eq!(upgrade_instructions.macos.len(), instructions.macos.len());
+                    }
+                    _ => panic!("Unexpected error type"),
+                }
+            }
+        }
+
+        mod config_required_builder {
+            use super::*;
+
+            #[test]
+            fn basic() {
+                let error = ErrorBuilder::config_required("test-server").build();
+                match error {
+                    McpError::ConfigurationRequired {
+                        server_name,
+                        missing_fields,
+                        field_descriptions,
+                    } => {
+                        assert_eq!(server_name, "test-server");
+                        assert!(missing_fields.is_empty());
+                        assert!(field_descriptions.is_empty());
+                    }
+                    _ => panic!("Unexpected error type"),
+                }
+            }
+
+            #[test]
+            fn with_field() {
+                let error = ErrorBuilder::config_required("api-server")
+                    .field("api_key", "API key for authentication")
+                    .build();
+                match error {
+                    McpError::ConfigurationRequired {
+                        server_name,
+                        missing_fields,
+                        field_descriptions,
+                    } => {
+                        assert_eq!(server_name, "api-server");
+                        assert_eq!(missing_fields, vec!["api_key"]);
+                        assert_eq!(
+                            field_descriptions,
+                            vec![(
+                                "api_key".to_string(),
+                                "API key for authentication".to_string()
+                            )]
+                        );
+                    }
+                    _ => panic!("Unexpected error type"),
+                }
+            }
+
+            #[test]
+            fn with_multiple_fields() {
+                let error = ErrorBuilder::config_required("db-server")
+                    .field("host", "Database host")
+                    .field("port", "Database port")
+                    .field("username", "Database username")
+                    .build();
+                match error {
+                    McpError::ConfigurationRequired {
+                        server_name,
+                        missing_fields,
+                        field_descriptions,
+                    } => {
+                        assert_eq!(server_name, "db-server");
+                        assert_eq!(missing_fields, vec!["host", "port", "username"]);
+                        assert_eq!(field_descriptions.len(), 3);
+                    }
+                    _ => panic!("Unexpected error type"),
+                }
+            }
+
+            #[test]
+            fn with_fields_iterator() {
+                let fields = vec![
+                    ("url", "Server URL"),
+                    ("token", "Auth token"),
+                    ("timeout", "Request timeout"),
+                ];
+                let error = ErrorBuilder::config_required("web-server")
+                    .fields(fields.clone())
+                    .build();
+                match error {
+                    McpError::ConfigurationRequired {
+                        server_name,
+                        missing_fields,
+                        field_descriptions,
+                    } => {
+                        assert_eq!(server_name, "web-server");
+                        assert_eq!(missing_fields, vec!["url", "token", "timeout"]);
+                        assert_eq!(field_descriptions.len(), 3);
+                        assert_eq!(field_descriptions[0].0, "url");
+                        assert_eq!(field_descriptions[0].1, "Server URL");
+                    }
+                    _ => panic!("Unexpected error type"),
+                }
+            }
+
+            #[test]
+            fn mixed_fields() {
+                let error = ErrorBuilder::config_required("complex-server")
+                    .field("primary", "Primary config")
+                    .fields(vec![
+                        ("secondary", "Secondary config"),
+                        ("tertiary", "Tertiary config"),
+                    ])
+                    .field("final", "Final config")
+                    .build();
+                match error {
+                    McpError::ConfigurationRequired {
+                        server_name,
+                        missing_fields,
+                        field_descriptions,
+                    } => {
+                        assert_eq!(server_name, "complex-server");
+                        assert_eq!(
+                            missing_fields,
+                            vec!["primary", "secondary", "tertiary", "final"]
+                        );
+                        assert_eq!(field_descriptions.len(), 4);
+                    }
+                    _ => panic!("Unexpected error type"),
+                }
+            }
+
+            #[test]
+            fn with_string_types() {
+                // Test that various string types work with the fields method
+                let fields: Vec<(String, String)> = vec![
+                    ("field1".to_string(), "desc1".to_string()),
+                    ("field2".to_string(), "desc2".to_string()),
+                ];
+                let error = ErrorBuilder::config_required("string-server")
+                    .fields(fields)
+                    .build();
+                match error {
+                    McpError::ConfigurationRequired {
+                        server_name,
+                        missing_fields,
+                        field_descriptions,
+                    } => {
+                        assert_eq!(server_name, "string-server");
+                        assert_eq!(missing_fields.len(), 2);
+                        assert_eq!(field_descriptions.len(), 2);
+                    }
+                    _ => panic!("Unexpected error type"),
+                }
+            }
+        }
+    }
+}

@@ -187,3 +187,6 @@ pub fn parse_npm_package(package: &str) -> (String, Option<String>) {
         (package.to_string(), None)
     }
 }
+
+#[cfg(test)]
+mod mod_proptest;
