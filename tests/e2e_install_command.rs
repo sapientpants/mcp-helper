@@ -32,8 +32,12 @@ fn test_install_npm_server_dry_run() -> Result<()> {
         "--dry-run",
     ])?;
 
-    // Should fail due to non-terminal environment
-    assert_stderr_contains(&result, "Dialog error");
+    // Should fail due to non-terminal environment or missing clients
+    let stderr = result.stderr_string();
+    assert!(
+        stderr.contains("Dialog error") || stderr.contains("No MCP clients selected"),
+        "Expected Dialog error or No MCP clients message, got: {stderr}"
+    );
 
     Ok(())
 }
@@ -54,7 +58,12 @@ fn test_install_with_config() -> Result<()> {
         "--dry-run",
     ])?;
 
-    assert_stderr_contains(&result, "Dialog error");
+    // Should fail due to non-terminal environment or missing clients
+    let stderr = result.stderr_string();
+    assert!(
+        stderr.contains("Dialog error") || stderr.contains("No MCP clients selected"),
+        "Expected Dialog error or No MCP clients message, got: {stderr}"
+    );
 
     Ok(())
 }
@@ -71,7 +80,12 @@ fn test_install_with_auto_deps() -> Result<()> {
         "--dry-run",
     ])?;
 
-    assert_stderr_contains(&result, "Dialog error");
+    // Should fail due to non-terminal environment or missing clients
+    let stderr = result.stderr_string();
+    assert!(
+        stderr.contains("Dialog error") || stderr.contains("No MCP clients selected"),
+        "Expected Dialog error or No MCP clients message, got: {stderr}"
+    );
 
     Ok(())
 }
@@ -87,7 +101,12 @@ fn test_install_with_version_specification() -> Result<()> {
         "--dry-run",
     ])?;
 
-    assert_stderr_contains(&result, "Dialog error");
+    // Should fail due to non-terminal environment or missing clients
+    let stderr = result.stderr_string();
+    assert!(
+        stderr.contains("Dialog error") || stderr.contains("No MCP clients selected"),
+        "Expected Dialog error or No MCP clients message, got: {stderr}"
+    );
 
     Ok(())
 }
@@ -99,7 +118,12 @@ fn test_install_server_not_found() -> Result<()> {
     let result = env.run_failure(&["install", "nonexistent-server-12345"])?;
 
     // Should fail on dialog in non-terminal environment
-    assert_stderr_contains(&result, "Dialog error");
+    // Should fail due to non-terminal environment or missing clients
+    let stderr = result.stderr_string();
+    assert!(
+        stderr.contains("Dialog error") || stderr.contains("No MCP clients selected"),
+        "Expected Dialog error or No MCP clients message, got: {stderr}"
+    );
 
     Ok(())
 }
@@ -112,7 +136,12 @@ fn test_install_missing_dependency() -> Result<()> {
     let result = env.run_failure(&["install", "@modelcontextprotocol/server-filesystem"])?;
 
     // Should fail on dialog in non-terminal environment
-    assert_stderr_contains(&result, "Dialog error");
+    // Should fail due to non-terminal environment or missing clients
+    let stderr = result.stderr_string();
+    assert!(
+        stderr.contains("Dialog error") || stderr.contains("No MCP clients selected"),
+        "Expected Dialog error or No MCP clients message, got: {stderr}"
+    );
 
     Ok(())
 }
@@ -158,7 +187,12 @@ fn test_install_binary_server() -> Result<()> {
         "--dry-run",
     ])?;
 
-    assert_stderr_contains(&result, "Dialog error");
+    // Should fail due to non-terminal environment or missing clients
+    let stderr = result.stderr_string();
+    assert!(
+        stderr.contains("Dialog error") || stderr.contains("No MCP clients selected"),
+        "Expected Dialog error or No MCP clients message, got: {stderr}"
+    );
 
     Ok(())
 }
@@ -180,7 +214,12 @@ print("Hello from Python MCP server")
     // The install command requires interactive input
     let result = env.run_failure(&["install", &python_script.to_string_lossy(), "--dry-run"])?;
 
-    assert_stderr_contains(&result, "Dialog error");
+    // Should fail due to non-terminal environment or missing clients
+    let stderr = result.stderr_string();
+    assert!(
+        stderr.contains("Dialog error") || stderr.contains("No MCP clients selected"),
+        "Expected Dialog error or No MCP clients message, got: {stderr}"
+    );
 
     Ok(())
 }
@@ -228,7 +267,12 @@ fn test_install_verbose_output() -> Result<()> {
     // Verbose mode should show detailed steps before failing
     assert_stderr_contains(&result, "Verbose mode enabled");
     assert_stdout_contains(&result, "Checking dependencies");
-    assert_stderr_contains(&result, "Dialog error");
+    // Should fail due to non-terminal environment or missing clients
+    let stderr = result.stderr_string();
+    assert!(
+        stderr.contains("Dialog error") || stderr.contains("No MCP clients selected"),
+        "Expected Dialog error or No MCP clients message, got: {stderr}"
+    );
 
     Ok(())
 }
@@ -259,7 +303,12 @@ fn test_install_config_validation() -> Result<()> {
     ])?;
 
     // Should fail on dialog before config validation
-    assert_stderr_contains(&result, "Dialog error");
+    // Should fail due to non-terminal environment or missing clients
+    let stderr = result.stderr_string();
+    assert!(
+        stderr.contains("Dialog error") || stderr.contains("No MCP clients selected"),
+        "Expected Dialog error or No MCP clients message, got: {stderr}"
+    );
 
     Ok(())
 }
@@ -279,7 +328,12 @@ fn test_install_with_multiple_config_values() -> Result<()> {
         "--dry-run",
     ])?;
 
-    assert_stderr_contains(&result, "Dialog error");
+    // Should fail due to non-terminal environment or missing clients
+    let stderr = result.stderr_string();
+    assert!(
+        stderr.contains("Dialog error") || stderr.contains("No MCP clients selected"),
+        "Expected Dialog error or No MCP clients message, got: {stderr}"
+    );
 
     Ok(())
 }

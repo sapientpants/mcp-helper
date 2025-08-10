@@ -102,8 +102,9 @@ fn test_mock_client_trait_methods() {
     assert!(client.add_server("server", config).is_ok());
 
     let servers = client.list_servers().unwrap();
-    assert_eq!(servers.len(), 1);
+    assert_eq!(servers.len(), 2); // test-server from builder + server we just added
     assert!(servers.contains_key("test-server"));
+    assert!(servers.contains_key("server"));
 }
 
 #[test]

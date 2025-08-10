@@ -233,9 +233,23 @@ mod tests {
             fields in prop::collection::vec(config_field(), 1..20),
         ) {
             let mut config = HashMap::new();
+            let mut seen_names = std::collections::HashSet::new();
+            let mut unique_fields = Vec::new();
+
+            // Filter out duplicate field names
+            for field in fields {
+                if seen_names.insert(field.name.clone()) {
+                    unique_fields.push(field);
+                }
+            }
+
+            // If no unique fields, nothing to test
+            if unique_fields.is_empty() {
+                return Ok(());
+            }
 
             // Generate valid values for each field type
-            for field in &fields {
+            for field in &unique_fields {
                 let value = match field.field_type {
                     ConfigFieldType::String => "test_string".to_string(),
                     ConfigFieldType::Number => "12345".to_string(),
@@ -246,7 +260,12 @@ mod tests {
                 config.insert(field.name.clone(), value);
             }
 
-            let result = validate_field_types(&config, &fields);
+            let result = validate_field_types(&config, &unique_fields);
+            if result.is_err() {
+                println!("Validation failed for fields: {unique_fields:?}");
+                println!("Config: {config:?}");
+                println!("Error: {result:?}");
+            }
             prop_assert!(result.is_ok());
         }
     }

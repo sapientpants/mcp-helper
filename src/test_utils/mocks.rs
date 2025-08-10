@@ -220,7 +220,7 @@ impl MockClientBuilder {
         MockClient {
             name: self.name,
             config_path: self.config_path,
-            servers: self.servers,
+            servers: std::sync::RwLock::new(self.servers),
             is_installed: self.is_installed,
         }
     }
@@ -230,7 +230,7 @@ impl MockClientBuilder {
 pub struct MockClient {
     name: String,
     config_path: PathBuf,
-    servers: HashMap<String, ServerConfig>,
+    servers: std::sync::RwLock<HashMap<String, ServerConfig>>,
     is_installed: bool,
 }
 
@@ -247,12 +247,15 @@ impl McpClient for MockClient {
         self.config_path.clone()
     }
 
-    fn add_server(&self, _name: &str, _config: ServerConfig) -> Result<()> {
+    fn add_server(&self, name: &str, config: ServerConfig) -> Result<()> {
+        let mut servers = self.servers.write().unwrap();
+        servers.insert(name.to_string(), config);
         Ok(())
     }
 
     fn list_servers(&self) -> Result<HashMap<String, ServerConfig>> {
-        Ok(self.servers.clone())
+        let servers = self.servers.read().unwrap();
+        Ok(servers.clone())
     }
 }
 
