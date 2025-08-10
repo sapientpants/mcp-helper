@@ -32,6 +32,7 @@
 //! - [`server`]: MCP server types (NPM, Docker, Binary, Python)
 //! - [`deps`]: Dependency checking and installation instructions
 //! - [`install`]: Main installation command logic
+//! - [`setup`]: Environment setup and verification
 //! - [`security`]: Security validation for server sources
 //! - [`error`]: Error types and handling
 //! - [`runner`]: Core server execution logic
@@ -56,6 +57,7 @@ pub mod logging;
 pub mod runner;
 pub mod security;
 pub mod server;
+pub mod setup;
 pub mod utils;
 
 // Test utilities module (always available in development/test builds)

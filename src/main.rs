@@ -169,9 +169,10 @@ fn execute_install_command(
 
 /// Execute the setup command
 fn execute_setup_command() -> anyhow::Result<()> {
-    println!("{}", "🔧 Running MCP Helper setup...".blue().bold());
-    print_not_implemented("Setup");
-    Ok(())
+    use mcp_helper::setup::SetupCommand;
+
+    let setup = SetupCommand::new(false); // verbose is global, not passed here
+    setup.execute().map_err(convert_mcp_error)
 }
 
 /// Execute config commands
