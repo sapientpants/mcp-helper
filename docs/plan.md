@@ -46,22 +46,22 @@ Implements the Universal MCP Launcher (see [features.md](features.md#1-universal
 
 ### Features:
 2. **`mcp install <server>`**
-   - npm package installation with proper paths
-   - Local directory installation support
-   - Platform-specific installation handling
-   - Progress indicators for long operations
+   - Configures MCP servers in client applications (Claude, VS Code, etc.)
+   - Validates server availability (npm registry, Docker Hub, etc.)
+   - Interactive configuration prompting (API keys, paths, etc.)
+   - Updates client config files with proper command setup (npx/docker handles actual installation)
 
 3. **`mcp setup`**
-   - One-time PATH configuration
-   - Shell profile updates (bashrc, zshrc, PowerShell profile)
-   - Environment variable setup for GUI apps
-   - Node.js installation detection and guidance
+   - Environment verification (checks Node.js/npm/npx are available)
+   - Docker availability check for container-based servers
+   - Shell completion setup (bash, zsh, PowerShell)
+   - Platform-specific command validation (npx vs npx.cmd on Windows)
 
 ### Justification:
-- **Completes the basic workflow** - Users can now install AND run servers
-- **Reduces friction** - No manual npm or PATH configuration
-- **Foundation for config management** - Sets up necessary directories and paths
-- **Eliminates "npx not found" errors** - Setup ensures environment is ready
+- **Completes the basic workflow** - Users can configure and run servers
+- **Reduces friction** - Automatic client detection and config updates
+- **Leverages existing tools** - npx/docker handle dependencies automatically
+- **Validates environment** - Setup ensures required tools are available
 
 ### Technical Approach:
 Implements the PackageManager and PlatformOperations traits defined in [architecture.md](architecture.md#key-components).

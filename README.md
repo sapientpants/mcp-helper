@@ -20,14 +20,16 @@
 
 ## What is MCP Helper?
 
-MCP Helper is a developer tool that eliminates cross-platform compatibility issues when working with Model Context Protocol servers. If you've ever struggled with:
+MCP Helper is a configuration and launcher tool that eliminates cross-platform compatibility issues when working with Model Context Protocol servers. It focuses on **configuring** MCP servers in client applications (Claude Desktop, VS Code, etc.) while leveraging existing tools (npx, docker) for package management.
 
+If you've ever struggled with:
 - ❌ `npx` not working properly on Windows
+- ❌ Manually editing complex JSON config files
 - ❌ Path separators breaking your config files
-- ❌ Environment variables not propagating to GUI apps
+- ❌ Not knowing which clients support which servers
 - ❌ "Works on my machine" when sharing MCP servers
 
-Then MCP Helper is for you. **One tool, zero platform headaches.**
+Then MCP Helper is for you. **Configuration made simple, packages handled by npx/docker.**
 
 ## Installation
 
@@ -92,30 +94,31 @@ mcp run my-server    # Works on Windows/Mac/Linux
 
 - Handles `npx`/`npx.cmd` detection automatically
 - Manages path separators transparently  
-- Inherits shell environment on macOS/Linux GUI apps
+- Lets npx handle package installation automatically
 
-### 📁 Smart Config Management
+### 📦 Smart Server Configuration
 
 ```bash
-mcp config add my-server      # Adds to the right location
+mcp install @modelcontextprotocol/server-filesystem  # Configure in clients
+mcp install my-docker-server                         # Works with Docker too
+```
+
+- Validates server availability (npm registry, Docker Hub)
+- Prompts for configuration (API keys, allowed paths, etc.)
+- Updates client configs to use npx/docker commands
+- Auto-detects installed MCP clients
+
+### 📁 Configuration Management
+
+```bash
+mcp config add my-server      # Add existing server to config
 mcp config list               # Shows all configured servers
 mcp config remove my-server   # Safely removes server config
 ```
 
-- Auto-detects Claude config location on each platform
+- Auto-detects config locations on each platform
 - Atomic writes prevent corruption
-- Automatic path normalization for cross-platform configs
-
-### 🔧 Development Environment Normalization
-
-```bash
-mcp init                    # Creates cross-platform project
-mcp generate-ide-config     # VS Code settings that work everywhere
-```
-
-- Handles Node.js version differences
-- Generates `.gitignore` with platform-specific exclusions
-- Creates IDE configurations that work across teams
+- Preserves comments and formatting in JSON
 
 ### 🏥 Built-in Diagnostics
 

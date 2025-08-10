@@ -1,17 +1,23 @@
-//! MCP server installation command implementation.
+//! MCP server configuration command implementation.
 //!
-//! This module contains the main installation logic for MCP servers. It handles
-//! dependency checking, security validation, client detection, server configuration,
-//! and the complete installation workflow.
+//! This module configures MCP servers in client applications (Claude Desktop, VS Code, etc.).
+//! It handles dependency checking, security validation, client detection, and configuration
+//! updates. The actual package installation is delegated to npx/docker/etc.
+//!
+//! # Architecture
+//!
+//! MCP Helper is a configuration tool, NOT a package manager. We configure servers in
+//! client applications and let existing tools (npx, docker) handle package management.
+//! This approach follows the Unix philosophy: do one thing well.
 //!
 //! # Features
 //!
 //! - **Multi-Server Support**: NPM packages, Docker images, GitHub repos, binaries
-//! - **Multi-Client Integration**: Installs to multiple MCP clients simultaneously
-//! - **Dependency Management**: Automatic checking and optional installation
+//! - **Multi-Client Integration**: Configures multiple MCP clients simultaneously
+//! - **Tool Checking**: Verifies required tools (Node.js, Docker) are installed
 //! - **Security Validation**: Validates server sources and warns about risks
 //! - **Interactive Configuration**: Guides users through server setup
-//! - **Batch Installation**: Install multiple servers from a file
+//! - **Batch Installation**: Configure multiple servers from a file
 //! - **Dry Run Mode**: Preview changes without making them
 //!
 //! # Example

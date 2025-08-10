@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-MCP Helper is a cross-platform tool written in Rust that eliminates compatibility issues when working with Model Context Protocol (MCP) servers. It acts as a universal launcher and configuration manager for MCP servers, making them "just work" on Windows, macOS, and Linux.
+MCP Helper is a cross-platform configuration and launcher tool written in Rust that eliminates compatibility issues when working with Model Context Protocol (MCP) servers. It focuses on configuring MCP servers in client applications (Claude Desktop, VS Code, etc.) and ensuring they run correctly across Windows, macOS, and Linux.
+
+**Key Design Principle**: MCP Helper is a configuration tool, NOT a package manager. It leverages existing tools (npx, docker) for dependency management rather than reimplementing them.
 
 ## Development Commands
 
@@ -65,26 +67,27 @@ MCP Helper is a cross-platform tool written in Rust that eliminates compatibilit
 - Python scripts (planned)
 - Docker containers (planned)
 
-**Dependency Management**: Intelligent dependency checking:
-- Detects missing dependencies (Node.js, Python, Docker, etc.)
-- Provides platform-specific installation instructions
-- Supports version requirements and validation
+**Dependency Checking**: Validates required tools are available:
+- Verifies Node.js/npm/npx presence for npm-based servers
+- Checks Docker availability for container-based servers
+- Provides guidance when tools are missing
+- Does NOT install dependencies (users should use official installers)
 
-**Install Command**: Interactive server installation:
-- Auto-detects installed MCP clients
-- Checks and validates dependencies before installation
-- Prompts for required and optional configuration
-- Updates client configs with atomic file operations
+**Install Command**: Configures servers in MCP clients:
+- Auto-detects installed MCP clients (Claude Desktop, VS Code, etc.)
+- Validates server exists in registry (npm, Docker Hub, etc.)
+- Prompts for server-specific configuration (API keys, paths, etc.)
+- Updates client configs to use npx/docker commands (which handle actual installation)
 
 ### Implementation Progress
 
 **Completed Features:**
-- ✅ `mcp run` - Cross-platform server execution
+- ✅ `mcp run` - Cross-platform server execution (handles npx vs npx.cmd)
 - ✅ Core architecture (client, server, deps modules)
 - ✅ Claude Desktop client support
-- ✅ NPM server support with version handling
-- ✅ Dependency checking with install instructions
-- ✅ `mcp install` - Interactive server installation (NPM servers)
+- ✅ NPM server configuration (client uses npx for actual installation)
+- ✅ Dependency checking (verifies tools are available)
+- ✅ `mcp install` - Server configuration in MCP clients
 
 **In Progress:**
 - 📦 Additional client support (Cursor, VS Code, Windsurf)
@@ -93,10 +96,10 @@ MCP Helper is a cross-platform tool written in Rust that eliminates compatibilit
 
 ### Implementation Phases (from docs/plan.md)
 - Phase 1: Core Runner ✅ COMPLETE - Basic `mcp run` command
-- Phase 2: Installation & Setup 🚧 IN PROGRESS - `mcp install` (NPM ✅) and `mcp setup`
+- Phase 2: Configuration & Setup 🚧 IN PROGRESS - `mcp install` (config ✅) and `mcp setup` (env check)
 - Phase 3: Configuration Management ⚙️ - Config CRUD operations
-- Phase 4: Diagnostics & Polish 🏥 - `mcp doctor` and auto-fixes
-- Phase 5: Enhanced Features 🚀 - Path conversion, env management
+- Phase 4: Diagnostics & Polish 🏥 - `mcp doctor` and validation
+- Phase 5: Enhanced Features 🚀 - Additional client support, shell completions
 
 ### Testing Approach
 - Platform-specific behavior tested with mocks
@@ -111,6 +114,20 @@ MCP Helper is a cross-platform tool written in Rust that eliminates compatibilit
 - `tempfile` - Safe atomic file operations
 - `semver` - Semantic version parsing and comparison
 - `dialoguer` - Interactive CLI prompts and multi-select
+
+## Architectural Philosophy
+
+MCP Helper follows the Unix philosophy of "do one thing well":
+- **We configure, not install** - npx/docker handle package management
+- **We validate, not fix** - Users install Node.js/Docker through official channels
+- **We detect, not assume** - Auto-detect clients and validate environments
+- **We simplify, not complicate** - Leverage existing tools rather than reinventing
+
+The main value propositions are:
+1. **Cross-platform compatibility** - Handle npx vs npx.cmd, path separators, etc.
+2. **Configuration management** - Update complex JSON configs safely
+3. **Interactive setup** - Guide users through configuration
+4. **Environment validation** - Ensure required tools are available
 
 ## Important Context
 

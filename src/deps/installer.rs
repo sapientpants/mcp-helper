@@ -4,7 +4,10 @@ use colored::Colorize;
 use dialoguer::Confirm;
 use std::process::Command;
 
-/// Auto-installer for missing dependencies
+/// Tool installer for missing runtime dependencies (Node.js, Docker, Python, etc.)
+///
+/// This installs the tools needed to run MCP servers (e.g., Node.js for npm packages),
+/// NOT the MCP server packages themselves. Package installation is handled by npx/docker.
 pub struct DependencyInstaller {
     dry_run: bool,
     auto_confirm: bool,
