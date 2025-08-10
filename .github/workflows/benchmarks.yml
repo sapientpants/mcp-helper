@@ -37,20 +37,21 @@ jobs:
         cargo bench --bench startup_time -- --output-format bencher | tee startup_output.txt
         cargo bench --bench performance -- --output-format bencher | tee performance_output.txt
 
-    - name: Store benchmark result
-      uses: benchmark-action/github-action-benchmark@v1
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-      with:
-        name: MCP Helper Benchmarks
-        tool: 'cargo'
-        output-file-path: startup_output.txt
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        auto-push: false  # Don't auto-push until gh-pages branch exists
-        # Only push results on main branch
-        comment-on-alert: true
-        alert-threshold: '120%'
-        comment-always: false  # Don't comment on PRs until setup is complete
-        benchmark-data-dir-path: 'dev/bench'
+    # TODO: Re-enable once gh-pages branch is created
+    # - name: Store benchmark result
+    #   uses: benchmark-action/github-action-benchmark@v1
+    #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    #   with:
+    #     name: MCP Helper Benchmarks
+    #     tool: 'cargo'
+    #     output-file-path: startup_output.txt
+    #     github-token: ${{ secrets.GITHUB_TOKEN }}
+    #     auto-push: false  # Don't auto-push until gh-pages branch exists
+    #     # Only push results on main branch
+    #     comment-on-alert: true
+    #     alert-threshold: '120%'
+    #     comment-always: false  # Don't comment on PRs until setup is complete
+    #     benchmark-data-dir-path: 'dev/bench'
 
     # Additional startup time analysis
     - name: Measure startup time directly
