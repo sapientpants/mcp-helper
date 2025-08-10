@@ -20,6 +20,44 @@ pub fn validate_required_fields(
     Ok(())
 }
 
+/// Validates that a value is a valid number
+fn validate_number(value: &str, field_name: &str) -> Result<(), String> {
+    value
+        .parse::<f64>()
+        .map(|_| ())
+        .map_err(|_| format!("Field '{field_name}' must be a valid number"))
+}
+
+/// Validates that a value is a valid boolean
+fn validate_boolean(value: &str, field_name: &str) -> Result<(), String> {
+    if matches!(
+        value.to_lowercase().as_str(),
+        "true" | "false" | "1" | "0" | "yes" | "no"
+    ) {
+        Ok(())
+    } else {
+        Err(format!("Field '{field_name}' must be a boolean value"))
+    }
+}
+
+/// Validates that a value is a valid URL
+fn validate_url(value: &str, field_name: &str) -> Result<(), String> {
+    if value.starts_with("http://") || value.starts_with("https://") {
+        Ok(())
+    } else {
+        Err(format!("Field '{field_name}' must be a valid URL"))
+    }
+}
+
+/// Validates that a value is a valid path
+fn validate_path(value: &str, field_name: &str) -> Result<(), String> {
+    if value.is_empty() {
+        Err(format!("Field '{field_name}' must be a non-empty path"))
+    } else {
+        Ok(())
+    }
+}
+
 /// Validates configuration field types and formats
 pub fn validate_field_types(
     config: &HashMap<String, String>,
@@ -28,29 +66,10 @@ pub fn validate_field_types(
     for field in fields {
         if let Some(value) = config.get(&field.name) {
             match field.field_type {
-                ConfigFieldType::Number => {
-                    if value.parse::<f64>().is_err() {
-                        return Err(format!("Field '{}' must be a valid number", field.name));
-                    }
-                }
-                ConfigFieldType::Boolean => {
-                    if !matches!(
-                        value.to_lowercase().as_str(),
-                        "true" | "false" | "1" | "0" | "yes" | "no"
-                    ) {
-                        return Err(format!("Field '{}' must be a boolean value", field.name));
-                    }
-                }
-                ConfigFieldType::Url => {
-                    if !value.starts_with("http://") && !value.starts_with("https://") {
-                        return Err(format!("Field '{}' must be a valid URL", field.name));
-                    }
-                }
-                ConfigFieldType::Path => {
-                    if value.is_empty() {
-                        return Err(format!("Field '{}' must be a non-empty path", field.name));
-                    }
-                }
+                ConfigFieldType::Number => validate_number(value, &field.name)?,
+                ConfigFieldType::Boolean => validate_boolean(value, &field.name)?,
+                ConfigFieldType::Url => validate_url(value, &field.name)?,
+                ConfigFieldType::Path => validate_path(value, &field.name)?,
                 ConfigFieldType::String => {
                     // String fields are always valid if present
                 }
