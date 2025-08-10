@@ -56,7 +56,7 @@ fn bench_raw_spawn_time(c: &mut Criterion) {
             let start = Instant::now();
 
             for _ in 0..iters {
-                let child = Command::new("./target/release/mcp-helper")
+                let child = Command::new("./target/release/mcp")
                     .arg("--version")
                     .spawn()
                     .expect("Failed to spawn command");
