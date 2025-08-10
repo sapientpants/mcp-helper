@@ -80,13 +80,27 @@ jobs:
         
         # Measure startup time (5 runs)
         echo "Running 5 startup time measurements..."
-        for i in {1..5}; do
-          START=$(date +%s.%N)
-          $BINARY_PATH --version > /dev/null
-          END=$(date +%s.%N)
-          DIFF=$(echo "$END - $START" | bc)
-          echo "Run $i: ${DIFF}s"
-        done
+        if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+          # Windows: Use PowerShell for timing
+          for i in {1..5}; do
+            powershell -Command "Measure-Command { & '$BINARY_PATH' --version > \$null } | Select-Object -ExpandProperty TotalSeconds" | while read SECS; do
+              echo "Run $i: ${SECS}s"
+            done
+          done
+        else
+          # Unix: Use date and bc (or awk as fallback)
+          for i in {1..5}; do
+            START=$(date +%s.%N 2>/dev/null || date +%s)
+            $BINARY_PATH --version > /dev/null
+            END=$(date +%s.%N 2>/dev/null || date +%s)
+            if command -v bc >/dev/null 2>&1; then
+              DIFF=$(echo "$END - $START" | bc)
+            else
+              DIFF=$(awk "BEGIN {print $END - $START}")
+            fi
+            echo "Run $i: ${DIFF}s"
+          done
+        fi
 
     # Platform-specific tests
     - name: Platform-specific E2E tests (Windows)

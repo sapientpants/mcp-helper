@@ -192,10 +192,11 @@ fn test_install_docker_server() -> Result<()> {
     assert!(
         stderr.contains("Dialog error")
             || stderr.contains("Docker")
+            || stderr.contains("docker")  // Matches "Failed to execute docker"
             || stderr.contains("No MCP clients selected")
             || stderr.contains("Failed to create config manager")
             || stderr.contains("Failed to get project directories"),
-        "Expected Dialog error, Docker error, No MCP clients, or config manager error, got: {stderr}"
+        "Expected Dialog error, Docker-related error, No MCP clients, or config manager error, got: {stderr}"
     );
 
     Ok(())
