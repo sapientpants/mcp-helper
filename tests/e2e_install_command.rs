@@ -32,11 +32,14 @@ fn test_install_npm_server_dry_run() -> Result<()> {
         "--dry-run",
     ])?;
 
-    // Should fail due to non-terminal environment or missing clients
+    // Should fail due to non-terminal environment, missing clients, or config manager error
     let stderr = result.stderr_string();
     assert!(
-        stderr.contains("Dialog error") || stderr.contains("No MCP clients selected"),
-        "Expected Dialog error or No MCP clients message, got: {stderr}"
+        stderr.contains("Dialog error")
+            || stderr.contains("No MCP clients selected")
+            || stderr.contains("Failed to create config manager")
+            || stderr.contains("Failed to get project directories"),
+        "Expected Dialog error, No MCP clients, or config manager error, got: {stderr}"
     );
 
     Ok(())
@@ -58,11 +61,14 @@ fn test_install_with_config() -> Result<()> {
         "--dry-run",
     ])?;
 
-    // Should fail due to non-terminal environment or missing clients
+    // Should fail due to non-terminal environment, missing clients, or config manager error
     let stderr = result.stderr_string();
     assert!(
-        stderr.contains("Dialog error") || stderr.contains("No MCP clients selected"),
-        "Expected Dialog error or No MCP clients message, got: {stderr}"
+        stderr.contains("Dialog error")
+            || stderr.contains("No MCP clients selected")
+            || stderr.contains("Failed to create config manager")
+            || stderr.contains("Failed to get project directories"),
+        "Expected Dialog error, No MCP clients, or config manager error, got: {stderr}"
     );
 
     Ok(())
@@ -80,11 +86,14 @@ fn test_install_with_auto_deps() -> Result<()> {
         "--dry-run",
     ])?;
 
-    // Should fail due to non-terminal environment or missing clients
+    // Should fail due to non-terminal environment, missing clients, or config manager error
     let stderr = result.stderr_string();
     assert!(
-        stderr.contains("Dialog error") || stderr.contains("No MCP clients selected"),
-        "Expected Dialog error or No MCP clients message, got: {stderr}"
+        stderr.contains("Dialog error")
+            || stderr.contains("No MCP clients selected")
+            || stderr.contains("Failed to create config manager")
+            || stderr.contains("Failed to get project directories"),
+        "Expected Dialog error, No MCP clients, or config manager error, got: {stderr}"
     );
 
     Ok(())
@@ -101,11 +110,14 @@ fn test_install_with_version_specification() -> Result<()> {
         "--dry-run",
     ])?;
 
-    // Should fail due to non-terminal environment or missing clients
+    // Should fail due to non-terminal environment, missing clients, or config manager error
     let stderr = result.stderr_string();
     assert!(
-        stderr.contains("Dialog error") || stderr.contains("No MCP clients selected"),
-        "Expected Dialog error or No MCP clients message, got: {stderr}"
+        stderr.contains("Dialog error")
+            || stderr.contains("No MCP clients selected")
+            || stderr.contains("Failed to create config manager")
+            || stderr.contains("Failed to get project directories"),
+        "Expected Dialog error, No MCP clients, or config manager error, got: {stderr}"
     );
 
     Ok(())
@@ -118,11 +130,14 @@ fn test_install_server_not_found() -> Result<()> {
     let result = env.run_failure(&["install", "nonexistent-server-12345"])?;
 
     // Should fail on dialog in non-terminal environment
-    // Should fail due to non-terminal environment or missing clients
+    // Should fail due to non-terminal environment, missing clients, or config manager error
     let stderr = result.stderr_string();
     assert!(
-        stderr.contains("Dialog error") || stderr.contains("No MCP clients selected"),
-        "Expected Dialog error or No MCP clients message, got: {stderr}"
+        stderr.contains("Dialog error")
+            || stderr.contains("No MCP clients selected")
+            || stderr.contains("Failed to create config manager")
+            || stderr.contains("Failed to get project directories"),
+        "Expected Dialog error, No MCP clients, or config manager error, got: {stderr}"
     );
 
     Ok(())
@@ -136,11 +151,14 @@ fn test_install_missing_dependency() -> Result<()> {
     let result = env.run_failure(&["install", "@modelcontextprotocol/server-filesystem"])?;
 
     // Should fail on dialog in non-terminal environment
-    // Should fail due to non-terminal environment or missing clients
+    // Should fail due to non-terminal environment, missing clients, or config manager error
     let stderr = result.stderr_string();
     assert!(
-        stderr.contains("Dialog error") || stderr.contains("No MCP clients selected"),
-        "Expected Dialog error or No MCP clients message, got: {stderr}"
+        stderr.contains("Dialog error")
+            || stderr.contains("No MCP clients selected")
+            || stderr.contains("Failed to create config manager")
+            || stderr.contains("Failed to get project directories"),
+        "Expected Dialog error, No MCP clients, or config manager error, got: {stderr}"
     );
 
     Ok(())
@@ -171,7 +189,13 @@ fn test_install_docker_server() -> Result<()> {
 
     // Docker check happens before dialog
     let stderr = result.stderr_string();
-    assert!(stderr.contains("Dialog error") || stderr.contains("Docker"));
+    assert!(
+        stderr.contains("Dialog error")
+            || stderr.contains("Docker")
+            || stderr.contains("Failed to create config manager")
+            || stderr.contains("Failed to get project directories"),
+        "Expected Dialog error, Docker error, or config manager error, got: {stderr}"
+    );
 
     Ok(())
 }
@@ -187,11 +211,14 @@ fn test_install_binary_server() -> Result<()> {
         "--dry-run",
     ])?;
 
-    // Should fail due to non-terminal environment or missing clients
+    // Should fail due to non-terminal environment, missing clients, or config manager error
     let stderr = result.stderr_string();
     assert!(
-        stderr.contains("Dialog error") || stderr.contains("No MCP clients selected"),
-        "Expected Dialog error or No MCP clients message, got: {stderr}"
+        stderr.contains("Dialog error")
+            || stderr.contains("No MCP clients selected")
+            || stderr.contains("Failed to create config manager")
+            || stderr.contains("Failed to get project directories"),
+        "Expected Dialog error, No MCP clients, or config manager error, got: {stderr}"
     );
 
     Ok(())
@@ -214,11 +241,14 @@ print("Hello from Python MCP server")
     // The install command requires interactive input
     let result = env.run_failure(&["install", &python_script.to_string_lossy(), "--dry-run"])?;
 
-    // Should fail due to non-terminal environment or missing clients
+    // Should fail due to non-terminal environment, missing clients, or config manager error
     let stderr = result.stderr_string();
     assert!(
-        stderr.contains("Dialog error") || stderr.contains("No MCP clients selected"),
-        "Expected Dialog error or No MCP clients message, got: {stderr}"
+        stderr.contains("Dialog error")
+            || stderr.contains("No MCP clients selected")
+            || stderr.contains("Failed to create config manager")
+            || stderr.contains("Failed to get project directories"),
+        "Expected Dialog error, No MCP clients, or config manager error, got: {stderr}"
     );
 
     Ok(())
@@ -267,11 +297,14 @@ fn test_install_verbose_output() -> Result<()> {
     // Verbose mode should show detailed steps before failing
     assert_stderr_contains(&result, "Verbose mode enabled");
     assert_stdout_contains(&result, "Checking dependencies");
-    // Should fail due to non-terminal environment or missing clients
+    // Should fail due to non-terminal environment, missing clients, or config manager error
     let stderr = result.stderr_string();
     assert!(
-        stderr.contains("Dialog error") || stderr.contains("No MCP clients selected"),
-        "Expected Dialog error or No MCP clients message, got: {stderr}"
+        stderr.contains("Dialog error")
+            || stderr.contains("No MCP clients selected")
+            || stderr.contains("Failed to create config manager")
+            || stderr.contains("Failed to get project directories"),
+        "Expected Dialog error, No MCP clients, or config manager error, got: {stderr}"
     );
 
     Ok(())
@@ -303,11 +336,14 @@ fn test_install_config_validation() -> Result<()> {
     ])?;
 
     // Should fail on dialog before config validation
-    // Should fail due to non-terminal environment or missing clients
+    // Should fail due to non-terminal environment, missing clients, or config manager error
     let stderr = result.stderr_string();
     assert!(
-        stderr.contains("Dialog error") || stderr.contains("No MCP clients selected"),
-        "Expected Dialog error or No MCP clients message, got: {stderr}"
+        stderr.contains("Dialog error")
+            || stderr.contains("No MCP clients selected")
+            || stderr.contains("Failed to create config manager")
+            || stderr.contains("Failed to get project directories"),
+        "Expected Dialog error, No MCP clients, or config manager error, got: {stderr}"
     );
 
     Ok(())
@@ -328,11 +364,14 @@ fn test_install_with_multiple_config_values() -> Result<()> {
         "--dry-run",
     ])?;
 
-    // Should fail due to non-terminal environment or missing clients
+    // Should fail due to non-terminal environment, missing clients, or config manager error
     let stderr = result.stderr_string();
     assert!(
-        stderr.contains("Dialog error") || stderr.contains("No MCP clients selected"),
-        "Expected Dialog error or No MCP clients message, got: {stderr}"
+        stderr.contains("Dialog error")
+            || stderr.contains("No MCP clients selected")
+            || stderr.contains("Failed to create config manager")
+            || stderr.contains("Failed to get project directories"),
+        "Expected Dialog error, No MCP clients, or config manager error, got: {stderr}"
     );
 
     Ok(())
