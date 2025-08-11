@@ -38,11 +38,14 @@ MCP Helper is a cross-platform configuration and launcher tool written in Rust t
 ### Module Structure
 - `src/main.rs` - CLI entry point using clap for argument parsing
 - `src/lib.rs` - Library root, re-exports public APIs
-- `src/runner.rs` - Core server runner with platform abstraction
+- `src/add.rs` - Unified add command for configuring servers
 - `src/client/` - MCP client implementations (Claude Desktop, etc.)
 - `src/server/` - MCP server types and implementations (NPM, Binary, etc.)
 - `src/deps/` - Dependency checking and installation instructions
-- `src/install.rs` - Install command implementation with interactive configuration
+- `src/install.rs` - Legacy install command (deprecated, redirects to add)
+- `src/config_commands.rs` - List and remove commands (moved to top-level)
+- `src/setup.rs` - Environment setup and verification
+- `src/doctor.rs` - Diagnostics and troubleshooting
 
 ### Key Components
 
@@ -50,11 +53,11 @@ MCP Helper is a cross-platform configuration and launcher tool written in Rust t
 - Windows: Uses `cmd.exe` and `npx.cmd`
 - macOS/Linux: Uses standard shell and `npx`
 
-**ServerRunner**: Main execution logic that:
-- Detects the current platform
-- Resolves server paths (npm packages or local files)
-- Normalizes path separators for cross-platform compatibility
-- Executes servers with proper error handling
+**Add Command**: Unified command for configuring servers:
+- Auto-detects server type (NPM, Docker, Python, Binary)
+- Handles platform-specific commands (npx vs npx.cmd on Windows)
+- Supports both interactive and non-interactive modes
+- Can add to multiple MCP clients simultaneously
 
 **McpClient Trait**: Abstraction for different MCP clients:
 - Provides unified interface for client configuration
@@ -82,12 +85,15 @@ MCP Helper is a cross-platform configuration and launcher tool written in Rust t
 ### Implementation Progress
 
 **Completed Features:**
-- ✅ `mcp run` - Cross-platform server execution (handles npx vs npx.cmd)
 - ✅ Core architecture (client, server, deps modules)
 - ✅ Claude Desktop client support
-- ✅ NPM server configuration (client uses npx for actual installation)
+- ✅ NPM server configuration (handles npx vs npx.cmd at config time)
 - ✅ Dependency checking (verifies tools are available)
-- ✅ `mcp install` - Server configuration in MCP clients
+- ✅ `mcp add` - Unified server configuration command
+- ✅ `mcp list` - List all configured servers
+- ✅ `mcp remove` - Remove servers from configuration
+- ✅ `mcp setup` - Environment verification
+- ✅ `mcp doctor` - Comprehensive diagnostics
 
 **In Progress:**
 - 📦 Additional client support (Cursor, VS Code, Windsurf)
@@ -95,11 +101,11 @@ MCP Helper is a cross-platform configuration and launcher tool written in Rust t
 - 📦 Python server support
 
 ### Implementation Phases (from docs/plan.md)
-- Phase 1: Core Runner ✅ COMPLETE - Basic `mcp run` command
-- Phase 2: Configuration & Setup 🚧 IN PROGRESS - `mcp install` (config ✅) and `mcp setup` (env check)
-- Phase 3: Configuration Management ⚙️ - Config CRUD operations
-- Phase 4: Diagnostics & Polish 🏥 - `mcp doctor` and validation
-- Phase 5: Enhanced Features 🚀 - Additional client support, shell completions
+- Phase 1: Core Commands ✅ COMPLETE - `mcp add/list/remove`
+- Phase 2: Environment & Diagnostics ✅ COMPLETE - `mcp setup` and `mcp doctor`
+- Phase 3: Enhanced Server Support 🚧 IN PROGRESS - Binary, Python, Docker servers
+- Phase 4: Additional Clients 📦 - Cursor, VS Code, Windsurf support
+- Phase 5: Polish & Features 🚀 - Shell completions, batch operations
 
 ### Testing Approach
 - Platform-specific behavior tested with mocks
@@ -157,22 +163,44 @@ The codebase will expand to include:
 - `diagnostics/` - Doctor command implementation
 - `ide/` - IDE configuration generators
 
-## Current Capabilities
+## Current CLI Commands
 
-The `mcp install` command now supports:
-- **NPM Server Installation**: Installs any NPM-based MCP server
-  - Handles scoped packages (e.g., `@modelcontextprotocol/server-filesystem`)
-  - Supports version specifications (e.g., `express@4.18.0`)
-- **Dependency Validation**: Checks for Node.js with version requirements
-- **Interactive Configuration**: Prompts for required and optional settings
-- **Multi-Client Support**: Can install to multiple MCP clients simultaneously
-- **Safe Config Updates**: Atomic writes with automatic backups
+MCP Helper focuses on configuration management with these simplified commands:
 
-Example usage:
+### Core Commands
+- `mcp add <server>` - Add a server to MCP client configuration
+  - Auto-detects server type (NPM, Docker, Python, Binary)
+  - Handles platform-specific commands (npx vs npx.cmd on Windows)
+  - Supports interactive configuration for environment variables
+  - Can add to multiple MCP clients simultaneously
+- `mcp list` - List all configured servers across all clients
+- `mcp remove <server>` - Remove a server from configuration
+  - `--all` flag to remove from all clients at once
+- `mcp setup` - One-time environment setup and verification
+- `mcp doctor` - Diagnose and fix common MCP issues
+
+### Deprecated Commands (still work but show warnings)
+- `mcp install` - Use `mcp add` instead
+- `mcp config add/list/remove` - Use top-level commands instead
+
+### Command Examples
 ```bash
-mcp install @modelcontextprotocol/server-filesystem
-mcp install @anthropic/mcp-server-slack
-mcp install some-mcp-server@1.2.3
+# Add servers (auto-detects type)
+mcp add @modelcontextprotocol/server-filesystem
+mcp add @anthropic/mcp-server-slack
+mcp add docker:nginx:alpine
+mcp add https://github.com/org/mcp-server/releases/latest
+
+# List configured servers
+mcp list
+
+# Remove a server
+mcp remove server-filesystem
+mcp remove server-slack --all  # Remove from all clients
+
+# Check environment
+mcp setup
+mcp doctor
 ```
 
 ## Working with MCP Helper

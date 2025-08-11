@@ -72,52 +72,60 @@ cargo install mcp-helper
 ## Quick Start
 
 ```bash
-# One-time setup - fixes platform-specific issues
+# One-time setup - verifies your environment
 mcp setup
 
-# Install any MCP server (works identically on all platforms)
-mcp install server-name
+# Add any MCP server (auto-detects type)
+mcp add @modelcontextprotocol/server-filesystem
+mcp add docker:nginx:alpine
 
-# Run a server without worrying about paths or npx
-mcp run server-name
+# List configured servers
+mcp list
+
+# Remove a server
+mcp remove server-filesystem
 ```
 
-That's it. No manual PATH configuration, no debugging Windows-specific issues, no platform-specific documentation needed.
+That's it. No manual JSON editing, no platform-specific commands, no complex configuration.
 
 ## Features
 
-### 🚀 Universal MCP Launcher
+### 🚀 Simplified Configuration Commands
 
 ```bash
-mcp run my-server    # Works on Windows/Mac/Linux
+mcp add my-server    # Auto-detects server type & platform needs
+mcp list             # Shows all configured servers
+mcp remove my-server # Safely removes from configuration
 ```
 
-- Handles `npx`/`npx.cmd` detection automatically
-- Manages path separators transparently  
-- Lets npx handle package installation automatically
+- Handles `npx`/`npx.cmd` detection at configuration time
+- Auto-detects server type (NPM, Docker, Python, Binary)
+- Supports multiple MCP clients simultaneously
 
-### 📦 Smart Server Configuration
+### 📦 Smart Server Detection
 
 ```bash
-mcp install @modelcontextprotocol/server-filesystem  # Configure in clients
-mcp install my-docker-server                         # Works with Docker too
+mcp add @modelcontextprotocol/server-filesystem  # NPM package
+mcp add docker:postgres:15                       # Docker image
+mcp add https://github.com/org/server/releases   # Binary download
+mcp add my-python-server.py                      # Python script
 ```
 
-- Validates server availability (npm registry, Docker Hub)
-- Prompts for configuration (API keys, allowed paths, etc.)
-- Updates client configs to use npx/docker commands
-- Auto-detects installed MCP clients
+- Auto-detects server type from naming patterns
+- Validates dependencies (Node.js, Docker, Python)
+- Prompts for configuration (API keys, environment variables)
+- Updates client configs with proper commands
 
-### 📁 Configuration Management
+### 📁 Multi-Client Support
 
 ```bash
-mcp config add my-server      # Add existing server to config
-mcp config list               # Shows all configured servers
-mcp config remove my-server   # Safely removes server config
+mcp add my-server  # Prompts to select which clients to configure
+mcp list           # Shows servers across all detected clients
+mcp remove my-server --all  # Remove from all clients at once
 ```
 
-- Auto-detects config locations on each platform
-- Atomic writes prevent corruption
+- Auto-detects installed clients (Claude Desktop, VS Code, etc.)
+- Atomic writes prevent config corruption
 - Preserves comments and formatting in JSON
 
 ### 🏥 Built-in Diagnostics
@@ -138,14 +146,14 @@ mcp doctor
 All checks passed! MCP is ready to use.
 ```
 
-### 🔄 Path and Environment Utilities
+### 🔧 Environment Setup
 
 ```bash
-# Set environment variables with platform-specific storage
-mcp env set API_KEY=your-secret-key
+# One-time environment verification
+mcp setup
 
-# Convert paths to platform-appropriate format
-mcp path convert ./my/unix/path  # Returns .\my\unix\path on Windows
+# Comprehensive system diagnostics
+mcp doctor
 ```
 
 - Handles environment variable storage per platform
