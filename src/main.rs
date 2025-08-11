@@ -1,8 +1,5 @@
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use std::env;
-
-mod runner;
 
 // Import from mcp_helper lib
 use mcp_helper::error::McpError;
@@ -23,19 +20,40 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    #[command(about = "Run an MCP server")]
-    Run {
-        #[arg(help = "Name of the MCP server to run")]
+    #[command(about = "Add an MCP server to client configuration")]
+    Add {
+        #[arg(help = "Name or path of the MCP server to add")]
         server: String,
 
-        #[arg(
-            trailing_var_arg = true,
-            help = "Additional arguments to pass to the server"
-        )]
+        #[arg(long, help = "Command to execute (e.g., npx, python, docker)")]
+        command: Option<String>,
+
+        #[arg(long, help = "Arguments for the command")]
         args: Vec<String>,
+
+        #[arg(long, help = "Environment variables in KEY=VALUE format")]
+        env: Vec<String>,
+
+        #[arg(long, help = "Skip interactive prompts")]
+        non_interactive: bool,
     },
 
-    #[command(about = "Install an MCP server")]
+    #[command(about = "List configured MCP servers")]
+    List {
+        #[arg(short, long, help = "Show detailed information")]
+        verbose: bool,
+    },
+
+    #[command(about = "Remove an MCP server from configuration")]
+    Remove {
+        #[arg(help = "Name of the server to remove")]
+        server: String,
+
+        #[arg(long, help = "Remove from all clients")]
+        all: bool,
+    },
+
+    #[command(about = "Install an MCP server", hide = true)] // Hidden/deprecated
     Install {
         #[arg(help = "Name or path of the MCP server to install")]
         server: String,
@@ -56,7 +74,7 @@ enum Commands {
     #[command(about = "One-time setup for your OS")]
     Setup,
 
-    #[command(about = "Manage MCP server configurations")]
+    #[command(about = "Manage MCP server configurations", hide = true)] // Hidden/deprecated
     Config {
         #[command(subcommand)]
         action: ConfigAction,
@@ -107,7 +125,15 @@ fn setup_logging(cli: &Cli) {
 /// Execute the requested command
 fn execute_command(cli: Cli) -> anyhow::Result<()> {
     match cli.command {
-        Commands::Run { server, args } => run_server(&server, &args, cli.verbose),
+        Commands::Add {
+            server,
+            command,
+            args,
+            env,
+            non_interactive,
+        } => execute_add_command(server, command, args, env, non_interactive, cli.verbose),
+        Commands::List { verbose } => execute_list_command(verbose || cli.verbose),
+        Commands::Remove { server, all } => execute_remove_command(server, all, cli.verbose),
         Commands::Install {
             server,
             auto_install_deps,
@@ -128,36 +154,30 @@ fn execute_command(cli: Cli) -> anyhow::Result<()> {
     }
 }
 
-/// Execute the install command
+/// Execute the install command (deprecated - redirects to add)
 fn execute_install_command(
     server: String,
-    auto_install_deps: bool,
-    dry_run: bool,
+    _auto_install_deps: bool,
+    _dry_run: bool,
     config: Vec<String>,
     batch: Option<String>,
     verbose: bool,
 ) -> anyhow::Result<()> {
-    use mcp_helper::install::InstallCommand;
+    eprintln!(
+        "{} The 'install' command is deprecated. Please use 'mcp add' instead.",
+        "⚠".yellow()
+    );
 
-    let mut install = InstallCommand::new(verbose);
-    install = install
-        .with_auto_install_deps(auto_install_deps)
-        .with_dry_run(dry_run)
-        .with_config_overrides(config);
-
-    if let Some(batch_file) = batch {
-        println!(
-            "{} Installing servers from batch file: {}",
-            "→".green(),
-            batch_file.cyan()
-        );
-        install
-            .execute_batch(&batch_file)
-            .map_err(convert_mcp_error)
-    } else {
-        println!("{} Installing MCP server: {}", "→".green(), server.cyan());
-        install.execute(&server).map_err(convert_mcp_error)
+    if batch.is_some() {
+        eprintln!("Batch installation is not yet supported in 'mcp add'.");
+        return Err(anyhow::anyhow!("Batch mode not supported"));
     }
+
+    // Parse config overrides into env vars
+    let env: Vec<String> = config;
+
+    // Redirect to add command
+    execute_add_command(server, None, Vec::new(), env, false, verbose)
 }
 
 /// Execute the setup command
@@ -168,23 +188,65 @@ fn execute_setup_command() -> anyhow::Result<()> {
     setup.execute().map_err(convert_mcp_error)
 }
 
-/// Execute config commands
+/// Execute the add command
+fn execute_add_command(
+    server: String,
+    command: Option<String>,
+    args: Vec<String>,
+    env: Vec<String>,
+    non_interactive: bool,
+    verbose: bool,
+) -> anyhow::Result<()> {
+    use mcp_helper::add::AddCommand;
+
+    let mut cmd = AddCommand::new(verbose);
+
+    // Parse environment variables
+    let mut env_map = std::collections::HashMap::new();
+    for env_var in env {
+        if let Some((key, value)) = env_var.split_once('=') {
+            env_map.insert(key.to_string(), value.to_string());
+        }
+    }
+
+    cmd.execute(&server, command, args, env_map, non_interactive)
+        .map_err(convert_mcp_error)
+}
+
+/// Execute the list command
+fn execute_list_command(verbose: bool) -> anyhow::Result<()> {
+    use mcp_helper::config_commands::ConfigListCommand;
+
+    let cmd = ConfigListCommand::new(verbose);
+    cmd.execute().map_err(convert_mcp_error)
+}
+
+/// Execute the remove command
+fn execute_remove_command(server: String, all: bool, verbose: bool) -> anyhow::Result<()> {
+    use mcp_helper::config_commands::ConfigRemoveCommand;
+
+    let mut cmd = ConfigRemoveCommand::new(verbose);
+    cmd.set_remove_all(all);
+    cmd.execute(&server).map_err(convert_mcp_error)
+}
+
+/// Execute config commands (deprecated - redirects to new top-level commands)
 fn execute_config_command(action: ConfigAction) -> anyhow::Result<()> {
-    use mcp_helper::config_commands::{ConfigAddCommand, ConfigListCommand, ConfigRemoveCommand};
+    eprintln!(
+        "{} The 'config' subcommands are deprecated. Please use top-level commands instead:",
+        "⚠".yellow()
+    );
+    eprintln!("  • 'mcp list' instead of 'mcp config list'");
+    eprintln!("  • 'mcp add' instead of 'mcp config add'");
+    eprintln!("  • 'mcp remove' instead of 'mcp config remove'");
+    eprintln!();
 
     match action {
         ConfigAction::Add { server } => {
-            let cmd = ConfigAddCommand::new(false); // verbose is global, not passed here
-            cmd.execute(&server).map_err(convert_mcp_error)
+            execute_add_command(server, None, Vec::new(), Vec::new(), false, false)
         }
-        ConfigAction::List => {
-            let cmd = ConfigListCommand::new(false); // verbose is global, not passed here
-            cmd.execute().map_err(convert_mcp_error)
-        }
-        ConfigAction::Remove { server } => {
-            let cmd = ConfigRemoveCommand::new(false); // verbose is global, not passed here
-            cmd.execute(&server).map_err(convert_mcp_error)
-        }
+        ConfigAction::List => execute_list_command(false),
+        ConfigAction::Remove { server } => execute_remove_command(server, false, false),
     }
 }
 
@@ -220,77 +282,14 @@ fn handle_result(result: anyhow::Result<()>) {
     }
 }
 
-fn run_server(server: &str, args: &[String], verbose: bool) -> anyhow::Result<()> {
-    println!(
-        "{} Running MCP server: {}",
-        "🚀".green(),
-        server.cyan().bold()
-    );
-
-    // Detect platform
-    let platform = detect_platform();
-    if verbose {
-        eprintln!("{} Detected platform: {:?}", "ℹ".blue(), platform);
-    }
-
-    // Create and use the server runner
-    let runner = runner::ServerRunner::new(platform, verbose);
-    runner.run(server, args)?;
-
-    Ok(())
-}
-
-fn detect_platform() -> runner::Platform {
-    match env::consts::OS {
-        "windows" => runner::Platform::Windows,
-        "macos" => runner::Platform::MacOS,
-        "linux" => runner::Platform::Linux,
-        _ => {
-            eprintln!(
-                "{} Unknown platform: {}, defaulting to Linux behavior",
-                "⚠".yellow(),
-                env::consts::OS
-            );
-            runner::Platform::Linux
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_platform_detection() {
-        let platform = detect_platform();
-        // Just ensure it returns something valid
-        match platform {
-            runner::Platform::Windows | runner::Platform::MacOS | runner::Platform::Linux => {}
-        }
-    }
-
-    #[test]
-    fn test_run_server_error_handling() {
-        // Test run_server with invalid server name
-        let result = run_server("nonexistent-server-xyz", &[], false);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_run_server_verbose() {
-        // Test run_server with verbose mode
-        let result = run_server("nonexistent-server-xyz", &["arg1".to_string()], true);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_platform_detection_current_os() {
-        let platform = detect_platform();
-        #[cfg(target_os = "windows")]
-        assert_eq!(platform, runner::Platform::Windows);
-        #[cfg(target_os = "macos")]
-        assert_eq!(platform, runner::Platform::MacOS);
-        #[cfg(target_os = "linux")]
-        assert_eq!(platform, runner::Platform::Linux);
+    fn test_cli_parsing() {
+        // Just ensure the CLI can be created
+        use clap::CommandFactory;
+        Cli::command().debug_assert();
     }
 }

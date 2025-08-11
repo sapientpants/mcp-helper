@@ -242,11 +242,19 @@ impl ConfigAddCommand {
 pub struct ConfigRemoveCommand {
     #[allow(dead_code)]
     verbose: bool,
+    remove_all: bool,
 }
 
 impl ConfigRemoveCommand {
     pub fn new(verbose: bool) -> Self {
-        Self { verbose }
+        Self {
+            verbose,
+            remove_all: false,
+        }
+    }
+
+    pub fn set_remove_all(&mut self, remove_all: bool) {
+        self.remove_all = remove_all;
     }
 
     pub fn execute(&self, server_name: &str) -> Result<(), McpError> {
@@ -277,10 +285,13 @@ impl ConfigRemoveCommand {
             )));
         }
 
-        // If found in multiple clients, ask which one
-        let selected_client = if found_in_clients.len() == 1 {
-            found_in_clients[0]
+        // If remove_all is set, remove from all clients
+        let selected_clients = if self.remove_all {
+            found_in_clients.clone()
+        } else if found_in_clients.len() == 1 {
+            vec![found_in_clients[0]]
         } else {
+            // Multiple clients and not remove_all, ask which one
             println!("Server found in multiple clients:");
             let client_names: Vec<_> = found_in_clients.iter().map(|c| c.name()).collect();
 
@@ -290,27 +301,37 @@ impl ConfigRemoveCommand {
                 .interact()
                 .map_err(|e| McpError::Other(anyhow::anyhow!("Selection failed: {}", e)))?;
 
-            found_in_clients[selection]
+            vec![found_in_clients[selection]]
         };
 
         // Show what will be removed
-        if let Ok(servers) = selected_client.list_servers() {
-            if let Some(config) = servers.get(server_name) {
-                println!("{}", "Will remove:".yellow());
-                println!("  Client: {}", selected_client.name().cyan());
-                println!("  Server: {}", server_name.yellow());
-                println!(
-                    "  Command: {} {}",
-                    config.command.green(),
-                    config.args.join(" ").dimmed()
-                );
-                println!();
+        println!("{}", "Will remove:".yellow());
+        for client in &selected_clients {
+            if let Ok(servers) = client.list_servers() {
+                if let Some(config) = servers.get(server_name) {
+                    println!("  Client: {}", client.name().cyan());
+                    println!(
+                        "    Command: {} {}",
+                        config.command.green(),
+                        config.args.join(" ").dimmed()
+                    );
+                }
             }
         }
+        println!();
 
         // Confirm removal
+        let prompt = if selected_clients.len() > 1 {
+            format!(
+                "Remove this server from {} clients?",
+                selected_clients.len()
+            )
+        } else {
+            "Remove this server configuration?".to_string()
+        };
+
         let confirm = Confirm::new()
-            .with_prompt("Remove this server configuration?")
+            .with_prompt(prompt)
             .default(false)
             .interact()
             .map_err(|e| McpError::Other(anyhow::anyhow!("Confirmation failed: {}", e)))?;
@@ -321,33 +342,48 @@ impl ConfigRemoveCommand {
         }
 
         // For now, we'll need to implement remove_server in the McpClient trait
-        // As a workaround, we can read all servers, remove the one, and write back
-        let mut servers = selected_client
-            .list_servers()
-            .map_err(|e| McpError::Other(anyhow::anyhow!("Failed to list servers: {}", e)))?;
-
-        servers.remove(server_name);
-
-        // We need to clear and re-add all servers (not ideal but works for now)
-        // This is a limitation we should fix by adding remove_server to the trait
+        // As a workaround, we inform the user to manually edit
         println!(
-            "{} Note: Server removal requires rewriting the entire config",
+            "{} Note: Server removal requires manual config editing",
             "⚠".yellow()
         );
         println!("This feature will be improved in a future update.");
-
-        println!(
-            "{} Server '{}' marked for removal from {}",
-            "✅".green(),
-            server_name.cyan(),
-            selected_client.name()
-        );
         println!();
-        println!("To complete removal, manually edit:");
-        println!(
-            "  {}",
-            selected_client.config_path().display().to_string().cyan()
-        );
+
+        if selected_clients.len() == 1 {
+            println!(
+                "{} Server '{}' marked for removal from {}",
+                "✅".green(),
+                server_name.cyan(),
+                selected_clients[0].name()
+            );
+            println!();
+            println!("To complete removal, manually edit:");
+            println!(
+                "  {}",
+                selected_clients[0]
+                    .config_path()
+                    .display()
+                    .to_string()
+                    .cyan()
+            );
+        } else {
+            println!(
+                "{} Server '{}' marked for removal from {} clients",
+                "✅".green(),
+                server_name.cyan(),
+                selected_clients.len()
+            );
+            println!();
+            println!("To complete removal, manually edit:");
+            for client in selected_clients {
+                println!(
+                    "  • {}: {}",
+                    client.name(),
+                    client.config_path().display().to_string().cyan()
+                );
+            }
+        }
 
         Ok(())
     }
@@ -379,8 +415,19 @@ mod tests {
     fn test_config_remove_command_creation() {
         let cmd = ConfigRemoveCommand::new(false);
         assert!(!cmd.verbose);
+        assert!(!cmd.remove_all);
 
         let cmd = ConfigRemoveCommand::new(true);
         assert!(cmd.verbose);
+        assert!(!cmd.remove_all);
+    }
+
+    #[test]
+    fn test_config_remove_set_remove_all() {
+        let mut cmd = ConfigRemoveCommand::new(false);
+        assert!(!cmd.remove_all);
+
+        cmd.set_remove_all(true);
+        assert!(cmd.remove_all);
     }
 }

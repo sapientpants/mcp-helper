@@ -46,6 +46,7 @@
 //! - **macOS**: 10.15+ (Intel, Apple Silicon)  
 //! - **Linux**: Ubuntu, Debian, CentOS, Fedora, Arch, Alpine (x64, ARM64)
 
+pub mod add;
 pub mod cache;
 pub mod client;
 pub mod config;
