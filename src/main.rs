@@ -177,25 +177,22 @@ fn execute_setup_command() -> anyhow::Result<()> {
 
 /// Execute config commands
 fn execute_config_command(action: ConfigAction) -> anyhow::Result<()> {
+    use mcp_helper::config_commands::{ConfigAddCommand, ConfigListCommand, ConfigRemoveCommand};
+
     match action {
         ConfigAction::Add { server } => {
-            println!("{} Adding server to config: {}", "→".green(), server.cyan());
-            print_not_implemented("Config add");
+            let cmd = ConfigAddCommand::new(false); // verbose is global, not passed here
+            cmd.execute(&server).map_err(convert_mcp_error)
         }
         ConfigAction::List => {
-            println!("{}", "📋 Configured MCP servers:".blue().bold());
-            print_not_implemented("Config list");
+            let cmd = ConfigListCommand::new(false); // verbose is global, not passed here
+            cmd.execute().map_err(convert_mcp_error)
         }
         ConfigAction::Remove { server } => {
-            println!(
-                "{} Removing server from config: {}",
-                "→".green(),
-                server.cyan()
-            );
-            print_not_implemented("Config remove");
+            let cmd = ConfigRemoveCommand::new(false); // verbose is global, not passed here
+            cmd.execute(&server).map_err(convert_mcp_error)
         }
     }
-    Ok(())
 }
 
 /// Execute the doctor command

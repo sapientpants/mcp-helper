@@ -49,6 +49,7 @@
 pub mod cache;
 pub mod client;
 pub mod config;
+pub mod config_commands;
 pub mod core;
 pub mod deps;
 pub mod error;
