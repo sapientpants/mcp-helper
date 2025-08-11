@@ -62,7 +62,7 @@ fn test_cli_help_for_subcommands() -> Result<()> {
     let env = TestEnvironment::new()?;
 
     // Test help for different subcommands
-    let subcommands = ["run", "install"];
+    let subcommands = ["add", "list", "remove", "setup", "doctor"];
 
     for subcommand in &subcommands {
         let result = env.run_success(&["help", subcommand])?;
@@ -90,7 +90,7 @@ fn test_cli_global_flags() -> Result<()> {
     let env = TestEnvironment::new()?;
 
     // Test that global flags work with subcommands
-    let result = env.run_success(&["--help", "run"])?;
+    let result = env.run_success(&["--help", "add"])?;
     assert_help_text_formatted(&result);
 
     Ok(())
@@ -101,7 +101,7 @@ fn test_cli_error_formatting() -> Result<()> {
     let env = TestEnvironment::new()?;
 
     // Trigger an error to see if it's properly formatted
-    let result = env.run_failure(&["run"])?; // Missing required argument
+    let result = env.run_failure(&["add"])?; // Missing required argument
 
     let stderr = result.stderr_string();
 

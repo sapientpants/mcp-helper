@@ -56,9 +56,6 @@ jobs:
     - name: Run E2E basic CLI tests
       run: cargo test --test e2e_basic_cli -- --test-threads=1
       
-    - name: Run E2E run command tests
-      run: cargo test --test e2e_run_command -- --test-threads=1
-      
     - name: Run E2E install command tests
       run: cargo test --test e2e_install_command -- --test-threads=1
       
