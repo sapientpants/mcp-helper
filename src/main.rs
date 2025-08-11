@@ -71,7 +71,7 @@ enum Commands {
         batch: Option<String>,
     },
 
-    #[command(about = "One-time setup for your OS")]
+    #[command(about = "Quick environment check (first-time setup)")]
     Setup,
 
     #[command(about = "Manage MCP server configurations", hide = true)] // Hidden/deprecated
@@ -80,7 +80,7 @@ enum Commands {
         action: ConfigAction,
     },
 
-    #[command(about = "Diagnose and fix common MCP issues")]
+    #[command(about = "Comprehensive diagnostics (troubleshooting)")]
     Doctor,
 }
 

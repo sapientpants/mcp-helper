@@ -26,6 +26,7 @@ impl SetupCommand {
     /// Execute the setup command
     pub fn execute(&self) -> Result<(), McpError> {
         println!("{}", "🔧 MCP Helper Environment Setup".blue().bold());
+        println!("Verifying your environment has the required tools...");
         println!();
 
         // Check for Node.js (required for npm-based servers)
@@ -44,12 +45,11 @@ impl SetupCommand {
         println!("{}", "✅ Environment setup complete!".green().bold());
         println!();
         println!("You can now:");
-        println!("  • Run servers with: {}", "mcp run <server>".cyan());
-        println!(
-            "  • Configure servers with: {}",
-            "mcp install <server>".cyan()
-        );
-        println!("  • Check configuration with: {}", "mcp config list".cyan());
+        println!("  • Add servers with: {}", "mcp add <server>".cyan());
+        println!("  • List configured servers with: {}", "mcp list".cyan());
+        println!("  • Remove servers with: {}", "mcp remove <server>".cyan());
+        println!();
+        println!("If you encounter issues, run: {}", "mcp doctor".cyan());
 
         Ok(())
     }

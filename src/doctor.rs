@@ -472,7 +472,7 @@ impl DoctorCommand {
                     check: "Configuration issues".to_string(),
                     status: DiagnosticStatus::Warning,
                     message: Some(format!("Issues found: {}", servers_with_issues.join(", "))),
-                    solution: Some("Run 'mcp config list' to review configurations".to_string()),
+                    solution: Some("Run 'mcp list' to review configurations".to_string()),
                 });
             }
         }
