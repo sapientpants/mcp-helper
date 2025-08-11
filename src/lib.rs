@@ -52,6 +52,7 @@ pub mod config;
 pub mod config_commands;
 pub mod core;
 pub mod deps;
+pub mod doctor;
 pub mod error;
 pub mod install;
 pub mod logging;

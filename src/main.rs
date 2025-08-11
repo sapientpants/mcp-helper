@@ -82,13 +82,6 @@ enum ConfigAction {
     },
 }
 
-fn print_not_implemented(command: &str) {
-    println!(
-        "{}",
-        format!("{command} command not yet implemented").yellow()
-    );
-}
-
 fn main() {
     let cli = Cli::parse();
 
@@ -197,9 +190,10 @@ fn execute_config_command(action: ConfigAction) -> anyhow::Result<()> {
 
 /// Execute the doctor command
 fn execute_doctor_command() -> anyhow::Result<()> {
-    println!("{}", "🏥 Running MCP diagnostics...".blue().bold());
-    print_not_implemented("Doctor");
-    Ok(())
+    use mcp_helper::doctor::DoctorCommand;
+
+    let doctor = DoctorCommand::new(false); // verbose is global, not passed here
+    doctor.execute().map_err(convert_mcp_error)
 }
 
 /// Convert McpError to anyhow::Error
@@ -273,12 +267,6 @@ mod tests {
         match platform {
             runner::Platform::Windows | runner::Platform::MacOS | runner::Platform::Linux => {}
         }
-    }
-
-    #[test]
-    fn test_print_not_implemented() {
-        // Test that the function runs without panicking
-        print_not_implemented("TestCommand");
     }
 
     #[test]
