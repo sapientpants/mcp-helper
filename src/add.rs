@@ -50,12 +50,12 @@ impl AddCommand {
         }
 
         // Try to detect server type if command not specified
-        let (final_command, final_args, server_name) = if command.is_none() {
-            self.detect_server_config(server, args)?
-        } else {
+        let (final_command, final_args, server_name) = if let Some(cmd) = command {
             // Manual configuration
-            let cmd = self.get_platform_command(&command.unwrap());
-            (cmd, args, server.to_string())
+            let platform_cmd = self.get_platform_command(&cmd);
+            (platform_cmd, args, server.to_string())
+        } else {
+            self.detect_server_config(server, args)?
         };
 
         // Check dependencies based on command type
